@@ -48,7 +48,7 @@ This report assesses hearing thresholds for a sample of `r nlevels(data$id)` hea
 
 Figure \@ref(fig:rawdata) shows the trends in the hearing threshold for all volunteers over time.
 
-```{r rawdata, echo=FALSE, fig.cap="Hearing threshold over time, divided by left and right ear and by age group at the start of the study", fig.height=10}
+```{r rawdata, echo=FALSE, fig.cap="Hearing threshold over time, divided by left and right ear and by age group at the start of the study", fig.height=4.5}
 agedistribution <- data %>%
   group_by(age_discrete) %>%
   summarize(nb = n_distinct(id)) %>%
