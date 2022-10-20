@@ -1,0 +1,40 @@
+---
+documentclass: article
+fontsize: 12pt
+date: "`r Sys.Date()`"
+output: 
+  bookdown::pdf_document2: 
+    toc: false
+    latex_engine: xelatex
+    includes:
+      in_header: preamble.sty
+      before_body: titlepage.sty
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(haven) # to read SAS files
+library(rprojroot)
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Abstract {-}
+
+# Introduction and data exploration
+```{r load, include=FALSE, message=FALSE, warning=FALSE}
+data <- read_sas(find_root_file("data/hearing500lr.sas7bdat", 
+     criterion = has_file("LDA.Rproj"))) %>%
+  mutate(side = as.factor(side))
+```
+
+Describe the data, and use graphical techniques to explore the mean structure, the
+variance structure and the correlation structure. Summarize your conclusions. What are
+the implications with respect to statistical modeling ?
+
+# Methodology
+
+# Results
+
+# Discussion and conclusion
+
+## further research
+
