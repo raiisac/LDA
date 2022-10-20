@@ -25,10 +25,14 @@ data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
      criterion = has_file("LDA.Rproj"))) %>%
   mutate(side = as.factor(side),
          id = as.factor(id),
-         age_start = age - TIME)
+         age_measurement = age + TIME,
+         age_discrete = cut(age,
+                            breaks = c(0,30,50,70,100),
+                            labels = c("<30", "30-50", "50-70",">70")))
+#data %>%group_by(id) %>%summarize(diff = max(age_start) - min(age_start)) age_start should be the same all the time but there are huge differences. How is this possible?
 summary_data <- data %>%
   group_by(id) %>%
-  summarize(age_start = min(age_start),
+  summarize(age = min(age),
             followup = max(TIME),
             nb_visits_left = sum(side == "left"),
             nb_visits_right = sum(side == "right"),
@@ -37,16 +41,43 @@ summary_data <- data %>%
             visits_per_year = ifelse(followup == 0,
                                      NA,
                                      nb_visits / followup))
-sum(summary_data$nb_visits_left != summary_data$nb_visits_right)#there are 112 people who weren't measure an equal amount of times on the left and right side
+#sum(summary_data$nb_visits_left != summary_data$nb_visits_right)#there are 112 people who weren't measure an equal amount of times on the left and right side
 ```
 
-This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data$age_start))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data$visits_per_year, na.rm = T), digits = 2)` years, seperately for both ears.
+This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data$age))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data$visits_per_year, na.rm = T), digits = 2)` years, separately for both ears.
+
+Figure \@ref(fig:rawdata) shows the trends in the hearing threshold for all volunteers over time.
+
+```{r rawdata, echo=FALSE, fig.cap="Hearing threshold over time, divided by left and right ear and by age group at the start of the study", fig.height=10}
+agedistribution <- data %>%
+  group_by(age_discrete) %>%
+  summarize(nb = n_distinct(id)) %>%
+  ungroup() %>%
+  mutate(label = sprintf("%s, (n = %d)",age_discrete, nb))
+lbl_age <- agedistribution$label
+names(lbl_age) <- agedistribution$age_discrete
+
+data %>% 
+  mutate() %>%
+  ggplot() +
+  geom_line(aes(x = TIME, y = y,  group = id), alpha = 0.3) +
+  facet_grid(cols = vars(side),
+             rows = vars(age_discrete),
+             labeller = labeller(age_discrete = lbl_age)) +
+  theme_bw() +
+  ylab("Hearing threshold (Db)") 
+```
+
 
 Describe the data, and use graphical techniques to explore the mean structure, the
 variance structure and the correlation structure. Summarize your conclusions. What are
 the implications with respect to statistical modeling ?
 
 # Methodology
+
+
+
+All analysis was carried out with the statistical software R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA).
 
 # Results
 
