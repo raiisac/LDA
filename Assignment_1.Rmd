@@ -23,8 +23,24 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r load, include=FALSE, message=FALSE, warning=FALSE}
 data <- read_sas(find_root_file("data/hearing500lr.sas7bdat", 
      criterion = has_file("LDA.Rproj"))) %>%
-  mutate(side = as.factor(side))
+  mutate(side = as.factor(side),
+         id = as.factor(id),
+         age_start = age - TIME)
+summary_data <- data %>%
+  group_by(id) %>%
+  summarize(age_start = min(age_start),
+            followup = max(TIME),
+            nb_visits_left = sum(side == "left"),
+            nb_visits_right = sum(side == "right"),
+            nb_visits = n_distinct(TIME),
+            nb_measurements = n(),
+            visits_per_year = ifelse(followup == 0,
+                                     NA,
+                                     nb_visits / followup))
+sum(summary_data$nb_visits_left != summary_data$nb_visits_right)#there are 112 people who weren't measure an equal amount of times on the left and right side
 ```
+
+This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data$age_start))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data$visits_per_year, na.rm = T), digits = 2)` years, seperately for both ears.
 
 Describe the data, and use graphical techniques to explore the mean structure, the
 variance structure and the correlation structure. Summarize your conclusions. What are
