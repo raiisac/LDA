@@ -15,7 +15,10 @@ bibliography: references.bib
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(haven) # to read SAS files
+library(kableExtra)
+library(qwraps2)
 library(rprojroot)
+
 knitr::opts_chunk$set(echo = TRUE)
 ```
 # Abstract {-}
@@ -31,7 +34,7 @@ data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
                             breaks = c(0,30,50,70,100),
                             labels = c("<30", "30-50", "50-70",">70")))
 #data %>%group_by(id) %>%summarize(diff = max(age_start) - min(age_start)) age_start should be the same all the time but there are huge differences. How is this possible?
-summary_data <- data %>%
+summary_data_id <- data %>%
   group_by(id) %>%
   summarize(age = min(age),
             followup = max(TIME),
@@ -42,12 +45,48 @@ summary_data <- data %>%
             visits_per_year = ifelse(followup == 0,
                                      NA,
                                      nb_visits / followup))
-#sum(summary_data$nb_visits_left != summary_data$nb_visits_right)#there are 112 people who weren't measure an equal amount of times on the left and right side
+#sum(summary_data_id$nb_visits_left != summary_data_id$nb_visits_right)#there are 112 people who weren't measure an equal amount of times on the left and right side
+summary_data_visit <- data %>%
+  group_by(id, TIME) %>%
+  summarize(age = min(age) + max(TIME),
+            left = sum(side == "left") > 0,
+            right = sum(side == "right") > 0)
 ```
 
-This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data$age))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data$visits_per_year, na.rm = T), digits = 2)` years, separately for both ears.
+This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data_id$age))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data_id$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data_id$visits_per_year, na.rm = T), digits = 2)` years. Table \@ref(tab:demographics) describes the demographics in more detail. Normally, each ear is measured at each visit but this only happened in `r round(100*sum(summary_data_visit$left & summary_data_visit$right) /nrow(summary_data_visit), 2)`% of all visits. The left (right) ear was tested in `r round(100*sum(summary_data_visit$left) /nrow(summary_data_visit), 2)`% (`r round(100*sum(summary_data_visit$right) /nrow(summary_data_visit), 2)`%) of all visits.
+
+
 
 Figure \@ref(fig:rawdata) shows the trends in the hearing threshold for all volunteers over time.
+
+```{r demographics, echo=FALSE}
+summary_data_id %>% 
+  summarize(
+    qwraps2::frmt(min(age)), 
+    qwraps2::frmt(max(age)),
+    qwraps2::frmt(median(age)), 
+    qwraps2::mean_sd(age),
+    qwraps2::frmt(min(followup)), 
+    qwraps2::frmt(max(followup)), 
+    qwraps2::frmt(median(followup)),
+    qwraps2::mean_sd(followup),
+    qwraps2::frmt(min(nb_visits)), 
+    qwraps2::frmt(max(nb_visits)), 
+    qwraps2::frmt(median(nb_visits)),
+    qwraps2::mean_sd(nb_visits)) %>%
+  pivot_longer(cols = everything(),
+               names_to = "var",
+               values_to = "value") %>%
+  mutate(var = rep(c("min","max", "median", "mean (sd)"), 3)) %>%
+  kable(caption = "Demographics for all respondents",
+        col.names = NULL,
+        booktabs = TRUE,
+        position = "!b") %>%
+  pack_rows("Age at the beginning of the study", 1, 4) %>%
+  pack_rows("Years of follow-up", 5, 8) %>%
+  pack_rows("Number of visits", 9, 12) 
+```
+
 
 ```{r rawdata, echo=FALSE, fig.cap="Hearing threshold over time, divided by left and right ear and by age group at the start of the study", fig.height=5}
 agedistribution <- data %>%
@@ -70,9 +109,7 @@ data %>%
 ```
 
 
-Describe the data, and use graphical techniques to explore the mean structure, the
-variance structure and the correlation structure. Summarize your conclusions. What are
-the implications with respect to statistical modeling ?
+Describe the data, and use graphical techniques to explore the mean structure, the variance structure and the correlation structure. Summarize your conclusions. What are the implications with respect to statistical modeling ?
 
 # Methodology
 
