@@ -9,6 +9,7 @@ output:
     includes:
       in_header: preamble.sty
       before_body: titlepage.sty
+bibliography: references.bib  
 ---
 
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
@@ -53,7 +54,7 @@ agedistribution <- data %>%
   group_by(age_discrete) %>%
   summarize(nb = n_distinct(id)) %>%
   ungroup() %>%
-  mutate(label = sprintf("%s, (n = %d)",age_discrete, nb))
+  mutate(label = sprintf("%s, (n = %d)", age_discrete, nb))
 lbl_age <- agedistribution$label
 names(lbl_age) <- agedistribution$age_discrete
 
@@ -84,4 +85,6 @@ All analysis was carried out with the statistical software R. All scripts are fr
 # Discussion and conclusion
 
 ## further research
+
+# Bibliography
 
