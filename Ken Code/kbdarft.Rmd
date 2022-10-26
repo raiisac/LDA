@@ -1,0 +1,120 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+Q2
+
+
+```{r}
+library(sas7bdat)
+library(tidyverse)
+```
+```{r}
+data=read.sas7bdat("hearing500lr.sas7bdat")
+data$id=as.factor(data$id)
+data$yscale=2^(data$y/3)
+```
+
+```{r}
+data.right=data[data$side=="right",]
+data.left=data[data$side=="left",]
+```
+
+```{r}
+plot(data.right$age,data.right$y)
+plot(data.left$age,data.left$y)
+```
+
+y vs time by ear
+```{r}
+data.right.time0=data.right%>%filter(TIME==0)
+data.right$yscale.std=data.right$yscale
+for(i in unique(data.right$id)){
+  data.right$yscale.std[data.right$id==i]=data.right$yscale[data.right$id==i]/data.right$yscale[data.right$id==i][1]
+}
+```
+
+```{r}
+data.right.grouped=data.right%>%group_by("id")%>%mutate(agetime=age+TIME)
+```
+
+```{r}
+rloud.age.plot=ggplot(data.right.grouped,aes(agetime,yscale.std))+
+  geom_line(aes(group=id),stat="smooth",method = "lm",formula = y ~ x,size = 1.2, alpha = 0.5)
+  
+
+rloud.age.plot
+```
+
+y vs time by ear
+```{r}
+data.right.time0=data.right%>%filter(TIME==0)
+data.right$y.std=data.right$y
+for(i in unique(data.right$id)){
+  data.right$y.std[data.right$id==i]=data.right$y[data.right$id==i]/data.right$y[data.right$id==i][1]
+}
+```
+
+```{r}
+data.right.grouped=data.right%>%group_by("id")%>%mutate(agetime=age+TIME)
+```
+
+```{r}
+rloud.age.plot=ggplot(data.right.grouped,aes(TIME,y.std))+
+  geom_line(aes(group=id))+
+  scale_y_continuous(trans="log2")
+
+rloud.age.plot
+```
+
+y vs time by ear
+```{r}
+data.right.time0=data.right%>%filter(TIME==0)
+data.right$y.std=data.right$y
+for(i in unique(data.right$id)){
+  data.right$y.std[data.right$id==i]=data.right$y[data.right$id==i]-data.right$y[data.right$id==i][length(data.right$y[data.right$id==i])]
+}
+```
+
+```{r}
+data.right.grouped=data.right%>%group_by("id")%>%mutate(agetime=age+TIME)
+```
+
+```{r}
+rloud.age.plot=ggplot(data.right.grouped,aes(agetime,y))+
+  geom_line(aes(group=id))
+
+rloud.age.plot
+```
+
+```{r}
+groupsize.right=data.right%>%group_by(id)%>%summarise(n())
+
+```
+
+```{r}
+aucs=c()
+for(j in groupsize.right$id){
+  auc=0
+  for(i in 1:groupsize.right$`n()`[groupsize.right$id==j]){
+    auc=auc+(data.right$y[data.right$id==j,i+1]+data.right$y[data.right$id==j,i])*(data.right$TIME[data.right$id==j,i+1]-data.right$TIME[data.right$id==j,i]/2)
+  }
+}
+
+```
+
+```{r}
+y=rep(10,11)
+x=0:10
+auc=0
+for(i in (length(y):2)){
+  print(auc)
+  auc=auc+((y[i]+y[i-1])*(x[i]-x[i-1])/2)
+}
+auc
+```
+
+
+
+Q5
