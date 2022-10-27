@@ -18,6 +18,7 @@ library(haven) # to read SAS files
 library(kableExtra)
 library(qwraps2)
 library(rprojroot)
+library(patchwork)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -51,13 +52,29 @@ summary_data_visit <- data %>%
   summarize(age = min(age) + max(TIME),
             left = sum(side == "left") > 0,
             right = sum(side == "right") > 0)
+
+#correlations
+d <- data %>%
+  mutate(id = as.numeric(id),
+         left = 1*(side == "left")) %>%
+  dplyr::select(id, y, left, age_measurement)
+  
+library(psych)
+stats <- statsBy(d, group = c("id", "left"), cors = FALSE, cor = "cov", 
+        method = "pearson", use = "pairwise", poly = FALSE,
+        na.rm = TRUE, alpha = .05)
+#print(stats, short = FALSE)
 ```
 
-This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data_id$age))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data_id$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data_id$visits_per_year, na.rm = T), digits = 2)` years. Table \@ref(tab:demographics) describes the demographics in more detail. Normally, each ear is measured at each visit but this only happened in `r round(100*sum(summary_data_visit$left & summary_data_visit$right) /nrow(summary_data_visit), 2)`% of all visits. The left (right) ear was tested in `r round(100*sum(summary_data_visit$left) /nrow(summary_data_visit), 2)`% (`r round(100*sum(summary_data_visit$right) /nrow(summary_data_visit), 2)`%) of all visits.
+This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data_id$age))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data_id$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data_id$visits_per_year, na.rm = T), digits = 2)` years. Table \@ref(tab:demographics) describes the demographics in more detail. It can be seen that the data is highly unbalanced; there is a lot of variation in the time a volunteer is followed and in the number of times a volunteer visits. 
+Normally, each ear is measured at each visit but this only happened in `r round(100*sum(summary_data_visit$left & summary_data_visit$right) /nrow(summary_data_visit), 2)`% of all visits. The left (right) ear was tested in `r round(100*sum(summary_data_visit$left) /nrow(summary_data_visit), 2)`% (`r round(100*sum(summary_data_visit$right) /nrow(summary_data_visit), 2)`%) of all visits.
 
 
+Figures \@ref(fig:rawdata) and \@ref(fig:rawdata2) show the trends in the hearing threshold for all volunteers over time. These figures shows that many volunteers' hearing threshold over time has an erratic pattern meaning there is likely high variability **within subjects**. Additionally, variability between subjects is also high, especially for older volunteers. 
 
-Figure \@ref(fig:rawdata) shows the trends in the hearing threshold for all volunteers over time.
+Figure \@ref(fig:rawdata3) shows the mean and 95% confidence interval for the hearing threshold (dB) for different age group. The age is the age at the time the measurement was taken. While the top graph shows 15 age groups with approximately equal sample size (between 141 and 149 measurements in each group), the bottom graph shows age groups with the same interval range of about 5 years. Both graphs show that the variance increases with age and there doesn't seem to be a significant difference, on average, between left and right ears.
+
+
 
 ```{r demographics, echo=FALSE}
 summary_data_id %>% 
@@ -84,7 +101,7 @@ summary_data_id %>%
         position = "!b") %>%
   pack_rows("Age at the beginning of the study", 1, 4) %>%
   pack_rows("Years of follow-up", 5, 8) %>%
-  pack_rows("Number of visits", 9, 12) 
+  pack_rows("Number of visits", 9, 12)
 ```
 
 
@@ -108,16 +125,103 @@ data %>%
   ylab("Hearing threshold (Db)") 
 ```
 
+```{r rawdata2, echo=FALSE, fig.cap= "Hearing threshold over time, divided by left and right ear.", fig.height=5}
+eardistribution <- data %>%
+  group_by(side) %>%
+  summarize(nb = n_distinct(id)) %>%
+  ungroup() %>%
+  mutate(label = sprintf("%s, (n = %d)", side, nb))
+lbl_side <- eardistribution$label
+names(lbl_side) <- eardistribution$side
+
+data %>% 
+  mutate() %>%
+  ggplot() +
+  geom_line(aes(x = age_measurement, y = y,  group = id), alpha = 0.3) +
+  facet_grid(rows = vars(side),
+             labeller = labeller(side = lbl_side)) +
+  theme_bw() +
+  ylab("Hearing threshold (Db)") +
+  xlab("Age at the time of the measurement")
+```
+
+```{r rawdata3, echo=FALSE, message = FALSE, fig.cap= "Hearing threshold over time, divided by left and right ear. numbers in the bottom show the number of measurements that were taken.", fig.width = 5, fig.height=8}
+#same number of measurements 
+agediscrete <- data %>% 
+  mutate(
+    #age = cut(data$age_measurement, n = 15)
+    age = cut_number(data$age_measurement, n = 15)) %>%
+  group_by(side, age) %>%
+  summarize(mean = mean(y),
+            sd = sqrt(var(y)),
+            n = n()) %>%
+  ungroup() %>%
+  mutate(error = qnorm(0.975)*sd/sqrt(n))#95percent conf intervals
+  
+p <- agediscrete %>% 
+  ggplot() +
+  geom_pointrange(aes(x = age, y = mean, color = side, group = side, 
+                    ymin = mean - error, ymax = mean + error), 
+                  position = position_dodge(width = 0.5), alpha = 1) +
+  geom_text(aes(x = age, y = 0, label = n, color = side),
+            position = position_dodge(width = 1), size = 2) +
+  theme_bw() +
+  ylab("Hearing threshold (Db), mean and 95% CI") +
+  xlab("Age at the time of the measurement") + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+#same range intervals
+agediscrete <- data %>% 
+  mutate(
+    age = cut_interval(data$age_measurement, n = 15)) %>%
+    #age = cut_number(data$age_measurement, n = 15)) %>%
+  group_by(side, age) %>%
+  summarize(mean = mean(y),
+            sd = sqrt(var(y)),
+            n = n()) %>%
+  ungroup() %>%
+  mutate(error = qnorm(0.975)*sd/sqrt(n))#95percent conf intervals
+  
+q <- agediscrete %>% 
+  ggplot() +
+  geom_pointrange(aes(x = age, y = mean, color = side, group = side, 
+                    ymin = mean - error, ymax = mean + error), 
+                  position = position_dodge(width = 0.5), alpha = 1) +
+  geom_text(aes(x = age, y = 0, label = n, color = side),
+            position = position_dodge(width = 1), size = 2) +
+  theme_bw() +
+  ylab("Hearing threshold (Db), mean and 95% CI") +
+  xlab("Age at the time of the measurement") + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+plot <- p / q & theme(legend.position = "bottom") 
+plot + plot_layout(guides = "collect")
+
+```
+
 
 Describe the data, and use graphical techniques to explore the mean structure, the variance structure and the correlation structure. Summarize your conclusions. What are the implications with respect to statistical modeling ?
 
 # Methodology
 
-
-
 All analysis was carried out with the statistical software R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA).
 
+## Summary statistics
+
+## Multivariate model
+
+## Two-stage analysis
+
+## Random-effects model
+
 # Results
+
+## Summary statistics
+
+## Multivariate model
+
+## Two-stage analysis
+
+## Random-effects model
 
 # Discussion and conclusion
 
