@@ -1,0 +1,83 @@
+---
+title: "Untitled"
+author: "Kendall Brown r0773111"
+date: "10/26/2022"
+output: html_document
+---
+
+
+```{r}
+library(sas7bdat)
+library(tidyverse)
+```
+
+```{r}
+data=read.sas7bdat("hearing500lr.sas7bdat")
+#data$id=as.factor(data$id)
+data$yscale=2^(data$y/3)
+```
+
+```{r}
+data.right=data[data$side=="right",]
+data.left=data[data$side=="left",]
+```
+
+AUC right
+```{r}
+groupsize.right=data.right%>%group_by(id)%>%summarise(gs=n())%>%filter(gs>1)
+
+AUCS.right=c()
+
+for(i in groupsize.right$id){
+  datatemp=data.right[data.right$id==i,]
+  auc=rep(0,nrow(datatemp))
+  for(j in 1:nrow(datatemp)-1){
+    y1=datatemp$y[j]
+    y2=datatemp$y[j+1]
+    x1=datatemp$TIME[j]
+    x2=datatemp$TIME[j+1]
+    sum=(y1+y2)*(x2-x1)/2
+    auc[j]=sum
+  }
+  AUCS.right=append(AUCS.right,sum(auc))
+}
+AUCS.right
+
+groupsize.right$aucs.right=AUCS.right
+```
+
+AUC left
+```{r}
+groupsize.left=data.left%>%group_by(id)%>%summarise(gs=n())%>%filter(gs>1)
+
+AUCS.left=c()
+
+for(i in groupsize.left$id){
+  datatemp=data.left[data.left$id==i,]
+  auc=rep(0,nrow(datatemp))
+  for(j in 1:nrow(datatemp)-1){
+    y1=datatemp$y[j]
+    y2=datatemp$y[j+1]
+    x1=datatemp$TIME[j]
+    x2=datatemp$TIME[j+1]
+    sum=(y1+y2)*(x2-x1)/2
+    auc[j]=sum
+  }
+  AUCS.left=append(AUCS.left,sum(auc))
+}
+AUCS.left
+
+groupsize.left$aucs.left=AUCS.left
+```
+
+```{r}
+fulljoin=full_join(groupsize.left,groupsize.right,by="id")
+fulljoin$auc.ratio=fulljoin$aucs.right/fulljoin$aucs.left
+```
+
+```{r}
+data.right$y.std=data.right$y
+for(i in unique(data.right$id)){
+  data.right$y.std[data.right$id==i]=data.right$y[data.right$id==i]-data.right$y[data.right$id==i][1]
+}
+```
