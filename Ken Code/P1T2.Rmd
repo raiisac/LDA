@@ -75,9 +75,17 @@ fulljoin=full_join(groupsize.left,groupsize.right,by="id")
 fulljoin$auc.ratio=fulljoin$aucs.right/fulljoin$aucs.left
 ```
 
+Increments
 ```{r}
 data.right$y.std=data.right$y
 for(i in unique(data.right$id)){
   data.right$y.std[data.right$id==i]=data.right$y[data.right$id==i]-data.right$y[data.right$id==i][1]
+}
+```
+
+```{r}
+data.left$y.std=data.left$y
+for(i in unique(data.left$id)){
+  data.left$y.std[data.left$id==i]=data.left$y[data.left$id==i]-data.left$y[data.left$id==i][1]
 }
 ```
