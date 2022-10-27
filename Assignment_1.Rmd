@@ -248,10 +248,23 @@ Describe the data, and use graphical techniques to explore the mean structure, t
 
 # Methodology
 
+In this section, we explore a couple of different methods to analyze the data. 
 All analysis was carried out with the statistical software R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA).
 
 ## Summary statistics
-There are several options to 
+
+One possibility to deal with the hierarchical structure of the data is to summarize the data and reduce the number of measurements per subject to one.
+
+This can be done, for instance, by calculating the average change in the hearing threshold for each subject $i$, $\Delta_i$ as in equation \@ref(eq:delta) where $Y_{ijk}$ is the $k^{th}$ measurement for ear $j$ of subject $i$ and $n_{ij}$ is the total number of measurements of ear $j$ of subject $i$.
+\begin{equation}
+\Delta_i = \frac{(Y_{il1} - Y_{iln_{ij}}) + (Y_{ir1} - Y_{irn_{ij}})}{2}
+(\#eq:delta)
+\end{equation}
+
+An immediate problem with this method is that we have learned the the within-group variance in the hearing threshold is quite large. Focusing only on the first and last measurement is therefore risky. Additionally, if time would influence hearing threshold, we need to correct for the time between the first and last measurement since this differs a lot between subjects. This method also requires that each subjects' both ears have been measured at least twice.
+
+An even simpler summary statistic would be to use the average hearing threshold over all measurements and both ears. 
+
 
 ## Multivariate model
 
