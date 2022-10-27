@@ -19,6 +19,7 @@ library(kableExtra)
 library(qwraps2)
 library(rprojroot)
 library(patchwork)
+library(psych)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -58,12 +59,6 @@ d <- data %>%
   mutate(id = as.numeric(id),
          left = 1*(side == "left")) %>%
   dplyr::select(id, y, left, age_measurement)
-  
-library(psych)
-stats <- statsBy(d, group = c("id", "left"), cors = FALSE, cor = "cov", 
-        method = "pearson", use = "pairwise", poly = FALSE,
-        na.rm = TRUE, alpha = .05)
-#print(stats, short = FALSE)
 ```
 
 This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data_id$age))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data_id$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data_id$visits_per_year, na.rm = T), digits = 2)` years. Table \@ref(tab:demographics) describes the demographics in more detail. It can be seen that the data is highly unbalanced; there is a lot of variation in the time a volunteer is followed and in the number of times a volunteer visits. 
@@ -71,9 +66,6 @@ Normally, each ear is measured at each visit but this only happened in `r round(
 
 
 Figures \@ref(fig:rawdata) and \@ref(fig:rawdata2) show the trends in the hearing threshold for all volunteers over time. These figures shows that many volunteers' hearing threshold over time has an erratic pattern meaning there is likely high variability **within subjects**. Additionally, variability between subjects is also high, especially for older volunteers. 
-
-Figure \@ref(fig:rawdata3) shows the mean and 95% confidence interval for the hearing threshold (dB) for different age group. The age is the age at the time the measurement was taken. While the top graph shows 15 age groups with approximately equal sample size (between 141 and 149 measurements in each group), the bottom graph shows age groups with the same interval range of about 5 years. Both graphs show that the variance increases with age and there doesn't seem to be a significant difference, on average, between left and right ears.
-
 
 
 ```{r demographics, echo=FALSE}
@@ -145,6 +137,10 @@ data %>%
   xlab("Age at the time of the measurement")
 ```
 
+## Mean, variance and correlation structure
+
+Figure \@ref(fig:rawdata3) shows the mean and 95% confidence interval for the hearing threshold (dB) for different age group. The age is the age at the time the measurement was taken. While the top graph shows 15 age groups with approximately equal sample size (between 141 and 149 measurements in each group), the bottom graph shows age groups with the same interval range of about 5 years. Both graphs show that the variance increases with age and there doesn't seem to be a significant difference, on average, between left and right ears.
+
 ```{r rawdata3, echo=FALSE, message = FALSE, fig.cap= "Hearing threshold over time, divided by left and right ear. numbers in the bottom show the number of measurements that were taken.", fig.width = 5, fig.height=8}
 #same number of measurements 
 agediscrete <- data %>% 
@@ -199,6 +195,55 @@ plot + plot_layout(guides = "collect")
 ```
 
 
+```{r , echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
+stats <- statsBy(d, group = c("id", "left"), cors = FALSE, cor = "cov", 
+        method = "pearson", use = "pairwise", poly = FALSE,
+        na.rm = TRUE, alpha = .05)
+morethan1 <- d %>% group_by(id, left) %>% summarize(n = n()) %>% ungroup() %>%
+  group_by(id) %>%summarize(n=min(n)) %>%
+  right_join(d) %>% filter(n > 1) %>% dplyr::select(-n)#only keep id's that have more than 1 measurement both on left and right ear
+stats_gt1 <- statsBy(morethan1, group = c("id", "left"), cors = TRUE, cor = "cov", 
+        method = "pearson", use = "pairwise", poly = FALSE,
+        na.rm = TRUE, alpha = .05)
+#pull the correlations between y and age within each group
+cov_within <- sapply(X = 1:length(stats_gt1$r), 
+                     FUN = function(x) unlist(stats_gt1$r[x])[2])
+var_y <- sapply(X = 1:length(stats_gt1$r), 
+                FUN = function(x) unlist(stats_gt1$r[x])[1])
+var_age <- sapply(X = 1:length(stats_gt1$r), 
+                FUN = function(x) unlist(stats_gt1$r[x])[4])
+correlations_within <- data.frame(cov_within = cov_within,
+                                  var_y = var_y,
+                                  var_age = var_age) %>%
+  mutate(cor_within = cov_within / (sqrt(var_y)*sqrt(var_age)))
+#print(stats, short = FALSE)
+meanstructure <- data.frame(stats_gt1$mean)
+```
+It is obviuous that the data has a hierarchical structure where the highest hierarchical level is the level of the individual ($id$) and the second level is the side (left or right ear). Some basic descriptive statistics were derived using the [*statsBy*](https://www.rdocumentation.org/packages/psych/versions/2.2.9/topics/statsBy) function from the psych package. The intraclass correlation is `r unname(round(stats_gt1$ICC1['y'],2))` for the hearing threshold ($y$) and, as expected, very high (`r unname(round(stats_gt1$ICC1['age_measurement'],2))`) for age at the time of measurement. These high values reflect that the total variance in these variables that is associated with the groups is very high.
+
+The total correlation between y and the age at the measurement, ignoring the hierarchical structure, is `r round(cor(morethan1)['age_measurement','y'],2)`. Following @marzban2013within and @mongomery2017montgomery, the correlation matrix for each subject that has at least 2 measurements for both ears is calculated, one can obtain within-group correlations and variances (where a group is a unique combination of subject and side). Figure \@ref(fig:correlations) shows the histograms over all groups for the correlation between the age at the measurement and y, and the variances for both age and y (though the variance in age is not very informative). The mean or median of all within-group correlations is often used as a measure of within-group correlation. The mean (`r round(mean(correlations_within$cor_within, na.rm = TRUE),2)`) and median (`r round(median(correlations_within$cor_within, na.rm = TRUE),2)`) of the within-group correlations are indicated in red and blue respectively on the graph. It can we seen that within-group correlation spans the entire range from -1 to 1, meaning that age has a strong positive relationship to the hearing threshold for some and a strong negative relationship for others. Age will be a good predictor for hearing threshold for some but not for others. Between-group correlation is obtained by averaging the age at measurement and the hearing threshold for each group (see scatterplot in Figure \@ref(fig:correlations)) and then computing the correlation across the groups, obtaining `r round(cor(meanstructure)['age_measurement','y'],2)`. 
+
+```{r correlations, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE, fig.cap="The mean is indicated in red, the median in blue", fig.width = 6, fig.height=6}
+p1 <- ggplot() + geom_histogram(data = correlations_within, aes(x = cor_within)) + 
+  theme_bw() + xlab('Within-group correlation between y & age') +
+  ylab('Number of groups') +
+  geom_vline(aes(xintercept = mean(correlations_within$cor_within, na.rm = TRUE)), color = 'red') +
+  geom_vline(aes(xintercept = median(correlations_within$cor_within, na.rm = TRUE)), color = 'blue') 
+p2 <- ggplot(correlations_within) + geom_histogram(aes(x = var_y)) + 
+  theme_bw() + xlab("Variance in y") + ylab('Number of groups') + 
+  geom_vline(aes(xintercept = mean(correlations_within$var_y, na.rm = TRUE)), color = 'red') +
+  geom_vline(aes(xintercept = median(correlations_within$var_y, na.rm = TRUE)), color = 'blue') 
+p3 <- ggplot(correlations_within) + geom_histogram(aes(x = var_age)) + 
+  theme_bw() + xlab("Variance in age at the measurement") +
+  ylab('Number of groups')+ 
+  geom_vline(aes(xintercept = mean(correlations_within$var_age, na.rm = TRUE)), color = 'red') +
+  geom_vline(aes(xintercept = median(correlations_within$var_age, na.rm = TRUE)), color = 'blue') 
+p4 <- ggplot(meanstructure) + geom_point(aes(y = y, x = age_measurement)) +
+  xlab("mean age") + ylab("mean hearing threshold (dB)") + theme_bw() 
+  
+p1 + p2 + p3 + p4
+```
+
 Describe the data, and use graphical techniques to explore the mean structure, the variance structure and the correlation structure. Summarize your conclusions. What are the implications with respect to statistical modeling ?
 
 # Methodology
@@ -206,6 +251,7 @@ Describe the data, and use graphical techniques to explore the mean structure, t
 All analysis was carried out with the statistical software R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA).
 
 ## Summary statistics
+There are several options to 
 
 ## Multivariate model
 
