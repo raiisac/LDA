@@ -64,6 +64,8 @@ d <- data %>%
 This report assesses hearing thresholds for a sample of `r nlevels(data$id)` healthy male volunteers. The subjects were `r round(mean(summary_data_id$age))` years old on average at the start of the study and are followed for an average of `r round(mean(summary_data_id$followup), digits = 2)` years. The hearing threshold is measured, on average, every `r round(1/mean(summary_data_id$visits_per_year, na.rm = T), digits = 2)` years. Table \@ref(tab:demographics) describes the demographics in more detail. It can be seen that the data is highly unbalanced; there is a lot of variation in the time a volunteer is followed and in the number of times a volunteer visits. 
 Normally, each ear is measured at each visit but this only happened in `r round(100*sum(summary_data_visit$left & summary_data_visit$right) /nrow(summary_data_visit), 2)`% of all visits. The left (right) ear was tested in `r round(100*sum(summary_data_visit$left) /nrow(summary_data_visit), 2)`% (`r round(100*sum(summary_data_visit$right) /nrow(summary_data_visit), 2)`%) of all visits.
 
+Previous research on hearing data of the Baltimore Longitudinal Study of Aging (BLSA) showed a change in hearing threshold for all age groups but especially the older population in males [@doi:10.1121/1.399731]. In contrast to our dataset, @doi:10.1121/1.412231 and @morrell1997construction consider females in their study. They similarly found a decrease in hearing sensitivity for all ages at 500Hz and included a quadratic function of age to predict the hearing threshold, as in @verbeke2001conditional. Additionally, a statistically significant learning effect from the first visit to subsequent visits was found [@morrell1997construction; @verbeke2001conditional]. @morrell1997construction observed that hearing levels are slightly poorer on average on the left compared to the right ear and that the variance in the hearing threshold is higher for people with a higher age.
+
 
 Figures \@ref(fig:rawdata) and \@ref(fig:rawdata2) show the trends in the hearing threshold for all volunteers over time. These figures shows that many volunteers' hearing threshold over time has an erratic pattern meaning there is likely high variability **within subjects**. Additionally, variability between subjects is also high, especially for older volunteers. 
 
@@ -263,7 +265,7 @@ This can be done, for instance, by calculating the average change in the hearing
 
 An immediate problem with this method is that we have learned the the within-group variance in the hearing threshold is quite large. Focusing only on the first and last measurement is therefore risky. Additionally, if time would influence hearing threshold, we need to correct for the time between the first and last measurement since this differs a lot between subjects. This method also requires that each subjects' both ears have been measured at least twice.
 
-An even simpler summary statistic would be to use the average hearing threshold over all measurements and both ears. 
+An even simpler summary statistic would be to use the average hearing threshold over all measurements and both ears. This would, however, not allow us to analyse changes in individuals over time; we can only infer on the population effect between age an hearing threshold. 
 
 
 ## Multivariate model
@@ -275,6 +277,8 @@ An even simpler summary statistic would be to use the average hearing threshold 
 # Results
 
 ## Summary statistics
+
+
 
 ## Multivariate model
 
