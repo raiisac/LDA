@@ -362,7 +362,7 @@ save(vgm, file = find_root_file("data", "vgm.RData",
 plot(vgm, ylim = c(0,200))
 #box(); axis(1); axis(2); title(xlab = "TIME")
 ```
-Lastly, a semi-variogram is constructed using the [*joineR* package](https://rdrr.io/cran/joineR/). The total variance is estimated to be `r round(vgm$sigma2,2)`. Measurement error is approximately `r round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)`, the serial correlation component is approximately `r round(mean(vgm$svar[vgm$svar[,1]==21,2]),2) - round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)` and the between-subject variability is thus `r round(vgm$sigma2 - mean(vgm$svar[vgm$svar[,1]==21,2]),2)`
+Lastly, a semi-variogram is constructed using the [*joineR* package](https://rdrr.io/cran/joineR/) (Figure \@ref(fig:variogram)). The total variance is estimated to be `r round(vgm$sigma2,2)`. Measurement error is approximately `r round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)`, the serial correlation component is approximately `r round(mean(vgm$svar[vgm$svar[,1]==21,2]),2) - round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)` and the between-subject variability is thus `r round(vgm$sigma2 - mean(vgm$svar[vgm$svar[,1]==21,2]),2)`
 
 # Methodology
 
