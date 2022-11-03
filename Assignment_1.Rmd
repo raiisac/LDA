@@ -199,7 +199,7 @@ p <- agediscrete %>%
 p
 ```
 
-Figure \@ref(fig:discretetime1) shows Loess smoothing curves by age category and side of the ear. The trend in the average is slightly increasing for most groups. For the oldest group, there is a more pronounced increase in the hearing threshold. Additionally, the estimated standard errors around the mean are larger as time increases, likely due to dropout. Based on the estimated averages from \@ref(fig:discretetime1), squared residuals can be calculated. Figure \@ref(fig:discretetime2) shows the Loess smoothed variance function for each group.
+Figure \@ref(fig:discretetime1) shows Loess smoothing curves by age category and side of the ear. The trend in the average is slightly increasing for most groups. For the oldest group, there is a more pronounced increase in the hearing threshold. Additionally, the estimated standard errors around the mean are larger as time increases, likely due to dropout. Based on the estimated averages from \@ref(fig:discretetime1), squared residuals can be calculated. Figure \@ref(fig:discretetime2) shows the Loess smoothed variance function for each group. Overall, the variance seems quite constant over time and it is higher for older subjects. The downward trend at time $>15$ for the oldest age group can possibly not be trusted due to limited data.
 
 ```{r discretetime1, echo=FALSE, message = FALSE, fig.cap= "Loess smoothing on the hearing threshold since start of the study, divided by left and right ear and age group at the start of the study.", fig.width = 5, fig.height=5}
 data_discretetime <- data %>%
@@ -255,7 +255,8 @@ data_discretetime <- data_discretetime %>%
 
 p <- data_discretetime %>% 
   ggplot() +
-  geom_jitter(aes(x = timediscrete, y = sqrd_resid), alpha = 0.1, fill = "grey") +
+  geom_jitter(aes(x = timediscrete, y = sqrd_resid), alpha = 0.1, 
+              fill = "grey") +
   stat_smooth(aes(x = timediscrete, y = sqrd_resid), method =  "loess",
               fill = "blue", alpha = 0.2) +
   facet_grid(cols = vars(side),
@@ -305,31 +306,63 @@ The data has a hierarchical (grouped) structure since each individual ($id$) is 
 
 The total correlation between y and the age at the measurement, ignoring the hierarchical structure, is `r round(cor(morethan1)['age_measurement','y'],2)`. Following @marzban2013within and @mongomery2017montgomery, the correlation matrix for each subject that has at least 2 measurements for both ears is calculated, one can obtain within-group correlations and variances. Figure \@ref(fig:correlations) shows the histograms over all individuals for the correlation between the age at the measurement and y, and the variances for both age and y (though the variance in age is not very informative). The mean or median of all within-group correlations is often used as a measure of within-group correlation. The mean (`r round(mean(correlations_within$cor_within_age, na.rm = TRUE),2)`) and median (`r round(median(correlations_within$cor_within_age, na.rm = TRUE),2)`) of the within-group correlations are indicated in red and blue respectively on the graph. It can be seen that within-group correlation spans the entire range from -1 to 1, meaning that age has a strong positive relationship to the hearing threshold for some and a strong negative relationship for others. Age will be a good predictor for hearing threshold for some but not for others. Between-group correlation is obtained by averaging the age at measurement and the hearing threshold for each group (see scatterplot in Figure \@ref(fig:correlations)) and then computing the correlation across the groups, obtaining `r round(cor(meanstructure)['age_measurement','y'],2)`. 
 
-Panel B in Figure \@ref(fig:correlations) shows that the correlation between the side of th ear that is measured and the hearing threshold ($y$) is high for a some but small for most individuals. Panel C in Figure \@ref(fig:correlations) shows that the variance in the hearing threshold is usually less then 50 but can be very large for some individuals.
+Panel B in Figure \@ref(fig:correlations) shows that the correlation between the side of the ear that is measured and the hearing threshold ($y$) is high for some but small for most individuals. Panel C in Figure \@ref(fig:correlations) shows that the variance in the hearing threshold is usually less then 50 but can be very large for some individuals.
 
 
 ```{r correlations, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE, fig.cap="The mean is indicated in red, the median in blue", fig.width = 6, fig.height=6}
-p1 <- ggplot() + geom_histogram(data = correlations_within, aes(x = cor_within_age)) + 
+p1 <- ggplot() + geom_histogram(data = correlations_within, 
+                                aes(x = cor_within_age)) + 
   theme_bw() + xlab('Within-group correlation y & age') +
   ylab('Number of groups') +
-  geom_vline(aes(xintercept = mean(correlations_within$cor_within_age, na.rm = TRUE)), color = 'red') +
-  geom_vline(aes(xintercept = median(correlations_within$cor_within_age, na.rm = TRUE)), color = 'blue') 
+  geom_vline(aes(xintercept = mean(correlations_within$cor_within_age, 
+                                   na.rm = TRUE)), 
+             color = 'red') +
+  geom_vline(aes(xintercept = median(correlations_within$cor_within_age,
+                                     na.rm = TRUE)), 
+             color = 'blue') 
 p2 <- ggplot(correlations_within) + geom_histogram(aes(x = var_y)) + 
   theme_bw() + xlab("Variance in y") + ylab('Number of groups') + 
-  geom_vline(aes(xintercept = mean(correlations_within$var_y, na.rm = TRUE)), color = 'red') +
-  geom_vline(aes(xintercept = median(correlations_within$var_y, na.rm = TRUE)), color = 'blue') 
-p3 <- ggplot() + geom_histogram(data = correlations_within, aes(x = cor_within_left)) + 
+  geom_vline(aes(xintercept = mean(correlations_within$var_y, 
+                                   na.rm = TRUE)), 
+             color = 'red') +
+  geom_vline(aes(xintercept = median(correlations_within$var_y, 
+                                     na.rm = TRUE)), 
+             color = 'blue') 
+p3 <- ggplot() + geom_histogram(data = correlations_within, 
+                                aes(x = cor_within_left)) + 
   theme_bw() + xlab('Within-group correlation y & left') +
   ylab('Number of groups') +
-  geom_vline(aes(xintercept = mean(correlations_within$cor_within_left, na.rm = TRUE)), color = 'red') +
-  geom_vline(aes(xintercept = median(correlations_within$cor_within_left, na.rm = TRUE)), color = 'blue') 
+  geom_vline(aes(xintercept = mean(correlations_within$cor_within_left, 
+                                   na.rm = TRUE)), 
+             color = 'red') +
+  geom_vline(aes(xintercept = median(correlations_within$cor_within_left, 
+                                     na.rm = TRUE)), 
+             color = 'blue') 
 p4 <- ggplot(meanstructure) + geom_point(aes(y = y, x = age_measurement)) +
   xlab("mean age") + ylab("mean hearing threshold (dB)") + theme_bw() 
   
 p1 + p3 + p2 + p4 + plot_annotation(tag_levels = 'A')
 ```
 
-Describe the data, and use graphical techniques to explore the mean structure, the variance structure and the correlation structure. Summarize your conclusions. What are the implications with respect to statistical modeling ?
+
+
+```{r variogram, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE, fig.cap="Semi-variogram", fig.width = 6, fig.height=4}
+library(joineR)
+if (!file.exists(find_root_file("data/vgm.RData", 
+     criterion = has_file("LDA.Rproj")))) {
+vgm  <- joineR::variogram(data_discretetime[1:2887,'id'], 
+                          data_discretetime[1:2887,'timediscrete'], 
+                          data_discretetime[1:2887,'y'])#full dataset takes very long to calculate
+save(vgm, file = find_root_file("data", "vgm.RData", 
+     criterion = has_file("LDA.Rproj")))
+} else {
+  load(find_root_file("data/vgm.RData", 
+     criterion = has_file("LDA.Rproj")))
+}
+plot(vgm, ylim = c(0,200))
+#box(); axis(1); axis(2); title(xlab = "TIME")
+```
+Lastly, a semi-variogram is constructed using the [*joineR* package](https://rdrr.io/cran/joineR/). The total variance is estimated to be `r round(vgm$sigma2,2)`. Measurement error is approximately `r round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)`, the serial correlation component is approximately `r round(mean(vgm$svar[vgm$svar[,1]==21,2]),2) - round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)` and the between-subject variability is thus `r round(vgm$sigma2 - mean(vgm$svar[vgm$svar[,1]==21,2]),2)`
 
 # Methodology
 
