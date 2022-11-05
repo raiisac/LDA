@@ -1,0 +1,311 @@
+---
+title: "Log data analysis Assignment 1"
+author: Stefan Velev
+        Kendall Brown
+        Raïsa Carmen
+        Adhithya Unni Narayanan
+        Audrey Towo
+date: "2022-10-29"
+output: pdf_document
+---
+
+
+## Task 3
+
+
+```{r cars, include=FALSE}
+library(haven)
+library(dplyr)
+library(ggplot2)
+library(nlme)
+library(lme4)
+library(car)
+library(merTools)
+library(geepack)
+library(gee)
+library(stringr)
+df <- read_sas("E:/Downloads/hearing500lr.sas7bdat")
+
+df <- df %>% mutate(age_true = age + TIME)
+
+df$id <- as.factor(df$id)
+df$side<-as.factor(df$side)
+age_round<-round(df$age_true)
+df<-cbind(df,age_round)
+df_left <- df %>% filter(side == "left")
+df_right <- df %>% filter(side == "right")
+
+
+df_new <- df %>% group_by(id) %>%
+  filter(n() >= 4)
+
+df_new_left <- df %>% filter(side == "left")
+df_new_right <- df %>% filter(side == "right")
+
+```
+
+Our first task is to generate a multivariate model and find the most parsimonious mean structure for it. Given that the data set is unbalanced we will use the `gee` and `geepack` libraries which allow us to conduct Generalized Estimating Equations. We will conduct these under the strict assumptions of Normality, however we will analyze the effects which different within subject covariate structures both with the help of Quasi-Information Criterium and the RMSE of the fitted Residuals. Holding the assumtion of Normality for the GEE models leads to functionally the same model as the Multivariate model described in the lecture. In this first step we will conduct some model searching in order to select the most parsimonious mean structure. We will start with a complete model as well as available interaction terms and slowly reduce it. We will compare all models against each other with the help of the `QICu` statistic (lower is better), the significance of the parameters as well as an `ANOVA\MANOVA` comparison. After we find the appropriate mean structure we will take care of selecting the appropriate covariance structure. The models run below are run under the assumption of independence between observations of the same individual.
+
+```{r warning=FALSE}
+
+mf <- formula(y ~ age+TIME+side+age:TIME+age:side+TIME:side)
+gee1 <- geeglm(mf, data=df, id=id, corstr="independence")
+QIC(gee1)[2]
+mean(sqrt(resid(gee1)^2))
+coef(summary(gee1))
+#mf2 <- formula(y ~ age+TIME+age:TIME+age:side+TIME:side)
+#gee2 <- geeglm(mf2, data=df, id=id, corstr="independence")
+#QIC(gee2)[2]
+#mean(sqrt(resid(gee2)^2))
+#coef(summary(gee2))
+#mf3 <- formula(y ~ age+TIME+age:side+TIME:side)
+#gee3 <- geeglm(mf3, data=df, id=id, corstr="independence")
+#QIC(gee3)[2]
+#mean(sqrt(resid(gee3)^2))
+#coef(summary(gee3))
+mf4 <- formula(y ~ age+TIME)
+gee4 <- geeglm(mf4, data=df, id=id, corstr="independence")
+QIC(gee4)[2]
+mean(sqrt(resid(gee4)^2))
+coef(summary(gee4))
+mf5 <- formula(y ~ age)
+gee5 <- geeglm(mf5, data=df, id=id, corstr="independence")
+QIC(gee5)[2]
+mean(sqrt(resid(gee5)^2))
+coef(summary(gee5))
+#mf6 <- formula(y ~ TIME)
+#gee6 <- geeglm(mf6, data=df, id=id, corstr="independence")
+#QIC(gee6)[2]
+#mean(sqrt(resid(gee6)^2))
+#coef(summary(gee6))
+
+#anova(gee1,gee2)
+#anova(gee1,gee3)
+anova(gee1,gee4)
+anova(gee1,gee5)
+#anova(gee1,gee6)
+
+#anova(gee2,gee3)
+#anova(gee2,gee4)
+#anova(gee2,gee5)
+#anova(gee2,gee6)
+
+#anova(gee3,gee4)
+#anova(gee3,gee5)
+#anova(gee3,gee6)
+
+anova(gee4,gee5)
+#anova(gee4,gee6)
+
+#anova(gee5,gee6)
+
+
+```
+
+We find that the the model `y~ age+ TIME` that is we use only the age at the start of the survey as well as the elapsed time since the survey began is the most parsimonious model. In essence the actual participant age is what is most important. We further find that the effect of the `side` variable, nor does any of its interaction terms, does not play a large role in predicting hearing loss. This is something we would intuitively expect, people are not prone on average to loosing hearing in one ear compared to the other. These conclusions hold for a much wider selection of models (we present here only sample of what we tested) or even when we filter the data under different conditions (Removing subjects with less than $n=\{2,4,5,6\}$ observations,looking at only the right/left ear data base,treating each ear-subject pair as single subject, balancing the data, grouping the subjects in cohorts of $\{1,5,10,15,20\}$ years an creating dummy variables for them).\
+
+Now we will take a look at the covariance structure of the model. Certain structure are naturally excluded due to the nature of our data e.g. `AR(n)` or `Toeplitz` are not really meaningful when the time series points are not equally spaced. We will compare the same model mean structure i.e. `y~ age+ TIME` under different covariance structures and see which one produces the smallest Quasi Information Criterion (`QIC`) value.`[Comment: the code for unstructured covariance will not run bellow as it takes some computing time and may be annoying on weaker machines]`
+
+
+```{r}
+mf <- formula(y ~ age+TIME)
+gee_opt1 <- geeglm(mf, data=df, id=id, corstr="independence")
+QIC(gee_opt1)
+mean(sqrt(resid(gee_opt1)^2))
+gee_opt2 <- geeglm(mf, data=df, id=id, corstr="exchangeable")
+QIC(gee_opt2)
+mean(sqrt(resid(gee_opt2)^2))
+#gee_opt3 <- geeglm(mf, data=df, id=id, corstr="unstructured")
+#QIC(gee_opt3)
+
+
+```
+
+It appears that an independent covariance structure produces the lowest `QIC` value, nevertheless is behooves us to take a closer look at these two models. First lets consider the model with an exchangeable covariance structure. 
+
+```{r warning=FALSE}
+mf <- formula(y ~ age+TIME)
+gee_opt2_new<-gee(mf, data=df, id=id,family = gaussian, corstr = "exchangeable")
+summary(gee_opt2_new)$coefficients
+gee_opt2_new
+
+```
+
+In the above output we notice that we get two standart errors: Naive and Robust. Normally we would want to use the Robust estimates because the variances of coefficient estimates tend to be too small when responses within subjects are correlated (Bilder and Loughin, 2015), however in this case there is little difference between the Naive and Robust estimates. This further suggest that the independence assumption of the correlation structure seems realistic (Hothorn and Everitt, 2014). In the bottom we see a `Working correlation` output which shows an the upper $4\times 4$ of the Variance-Covariance matrix used for this model (the size depends on the number of observations per individual with the largest beeing $29\times 29$ ). Below we will report the best model we could find under the conditions of this task. It has the same parameter estimates as a least squares model with the same mean structure specification, however the robust errors in this model are more accurate, as some of the consitions of the least squares model are not fulfilled (e.g. Normaly distributed residuals)
+
+```{r warning=FALSE}
+mf <- formula(y ~ age+TIME)
+gee_opt1_new<-gee(mf, data=df, id=id,family = gaussian, corstr = "independence")
+summary(gee_opt1_new)$coefficients
+gee_opt1_new
+
+```
+
+
+## Task 4
+
+In this task we will conduct an explicit two stage analysis of the data first computing the intecepts and then computing the slopes of the model. First let us take a look at the per subject/side intercept.
+
+```{r}
+db_fixed = lme(y ~ 1,random=~1|id/age/side, data = df)
+
+
+```
+```{r echo=FALSE, warning=FALSE}
+
+dat_fixed<-data.frame(time=df$TIME,pred=fitted(db_fixed),Subject=df$id,side=df$side)
+dat_fixed$Subject<-as.numeric(dat_fixed$Subject)
+ggplot(data=dat_fixed,aes(x=time,y=pred,color=Subject,shape=side,group=interaction(Subject, side)))+theme_classic()+
+  geom_line()+geom_point()
+
+hist(unique(dat_fixed$pred),breaks = 50,
+     main = "Distribution of all intercepts",xlab = "Decibels")
+dat_fixed_right<-dat_fixed %>% filter(side=="right")
+dat_fixed_left<-dat_fixed %>% filter(side=="left")
+par(mfrow=c(1,2))
+left_intercepts<-unique(dat_fixed_left$pred)
+right_intercepts<-unique(dat_fixed_right$pred)
+
+hist(unique(dat_fixed_left$pred),breaks = 50,
+     main = "Distribution of left eat intercepts",xlab = "Decibels")
+hist(unique(dat_fixed_right$pred),breaks = 50,
+     main = "Distribution of right ear intercepts",xlab = "Decibels")
+
+```
+Further we can run a Komogorov-Smirnov test to see if the distribution of the left and right ear intercepts come from the same distribution
+```{r}
+
+ks.test(left_intercepts,right_intercepts)
+
+```
+Next we will run a series of linear models for each model, as we will see 
+
+```{r}
+
+df1<-cbind(df,fitted(db_fixed))
+colnames(df1)[8]<-"fitted_val"
+
+
+res.list1 <- lmList(I(y-fitted_val) ~0+age+ TIME|id/age/side, data=df1)
+
+b <- lapply(res.list1, coef)
+b <- as.data.frame(do.call(rbind,b))
+intercept<-rep(0,nrow(b))
+ID<-str_split_fixed(row.names(b), "/", 3)
+b<-cbind(ID,intercept,b)
+colnames(b)[1]<-"ID"
+colnames(b)[2]<-"age_true"
+colnames(b)[3]<-"side"
+b$ID<-as.numeric(b$ID)
+
+#for some reason it wont knit with these 3 graphs :( something is bugging it
+
+#ggplot(b)  + geom_abline(aes(intercept = intercept, slope = TIME, color=ID)) + 
+  #xlim(0.5, 10) +
+  #ylim(-1, 1)
+
+
+#plot(b$age_true,b$age,main = "Intercepts of age against age",xlab = "age",ylab = "slope of age for individual subject")
+#plot(b$age_true,b$TIME,main = "Intercepts of TIME against age",xlab = "age",ylab = "slope of TIME for individual subject")
+
+```
+# notes on how slopes are more disperesed at lower ages, how age effects when taken out of the entire datase (age is fixed for an id), still need to plot correlation between slopes and intercepts
+
+
+
+## Task 5
+
+```{r}
+db_mixed = lmer(y ~ age+TIME+ (1 | id), data = df)
+summary(db_mixed)
+plot(db_mixed)
+hist(residuals(db_mixed), breaks = 50)
+plot(residuals(db_mixed), type = "l")
+shapiro.test(residuals(db_mixed))
+acf(residuals(db_mixed))
+confint(db_mixed)
+ranef(db_mixed)$id %>% head(5)
+coef(db_mixed)$id %>% head(5)
+REsim(db_mixed)
+plotREsim(REsim(db_mixed))
+
+dat_mixed<-data.frame(time=df$TIME,pred=fitted(db_mixed),Subject=df$id)
+dat_mixed$Subject<-as.numeric(dat_mixed$Subject)
+ggplot(data=dat_mixed,aes(x=time,y=pred,group=Subject,color=Subject))+theme_classic()+geom_line()
+
+
+mean(sqrt(resid(db_mixed)^2))
+
+#assumptions check 
+#1. Error terms follow a Normal Distribution
+#2. Beta for subject i follows a Normal Distribution
+qint<-ranef(db_mixed)$id[["(Intercept)"]]
+qres<-residuals(db_mixed)
+qqnorm(qint,ylab = "Estimated Random Intecepts",main = "Random Intecepts")
+qqline(qint)
+
+qqnorm(qres,ylab = "Estimated Residuals",main = "Residuals")
+qqline(qres)
+
+db_mixed2 = lmer(y ~ age+TIME + (TIME | id), data = df,na.action = na.omit)
+summary(db_mixed2)
+plot(db_mixed2)
+hist(residuals(db_mixed2), breaks = 50)
+plot(residuals(db_mixed2), type = "l")
+shapiro.test(residuals(db_mixed2))
+acf(residuals(db_mixed2))
+confint(db_mixed2)
+ranef(db_mixed2)$id %>% head(5)
+coef(db_mixed2)$id %>% head(5)
+REsim(db_mixed2)
+plotREsim(REsim(db_mixed2))
+
+dat_mixed2<-data.frame(time=df$TIME,pred=fitted(db_mixed2),Subject=df$id)
+dat_mixed2$Subject<-as.numeric(dat_mixed2$Subject)
+ggplot(data=dat_mixed2,aes(x=time,y=pred,group=Subject,color=Subject))+theme_classic()+geom_line()
+
+anova(db_mixed,db_mixed2)
+
+```
+
+```{r}
+db_mixed5 = lme(y ~ age+TIME ,random=~1|TIME/id, data = df,cor = corAR1())
+summary(db_mixed5)
+plot(db_mixed5)
+hist(residuals(db_mixed5), breaks = 50)
+plot(residuals(db_mixed5), type = "l")
+shapiro.test(residuals(db_mixed5))
+acf(residuals(db_mixed5))
+
+
+dat_mixed5<-data.frame(time=df$TIME,pred=fitted(db_mixed5),Subject=df$id,side=df$side)
+dat_mixed5$Subject<-as.numeric(dat_mixed5$Subject)
+dat_mixed5<-dat_mixed5 %>% filter(side=="right")
+ggplot(data=dat_mixed5,aes(x=time,y=pred,color=Subject,shape=side,group=interaction(Subject, side)))+theme_classic()+
+  geom_line()+geom_point()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+Bilder, C. and Loughin, T. (2015). Analysis of Categorical Data with R. CRC Press.
+Hothorn, T. and Everitt, B. (2014). A Handbook of Statistical Analyses using R. CRC Press, 3rd Edition.
+
+
+
+
+
+
+
+
+
+
+
