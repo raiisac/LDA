@@ -20,6 +20,7 @@ library(qwraps2)
 library(rprojroot)
 library(patchwork)
 library(psych)
+library(gtools)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -373,16 +374,42 @@ All analysis was carried out with the statistical software R. All scripts are fr
 
 One possibility to deal with the hierarchical structure of the data is to summarize the data and reduce the number of measurements per subject to one.
 
-This can be done, for instance, by calculating the average change in the hearing threshold for each subject $i$, $\Delta_i$ as in equation \@ref(eq:delta) where $Y_{ijk}$ is the $k^{th}$ measurement for ear $j$ of subject $i$ and $n_{ij}$ is the total number of measurements of ear $j$ of subject $i$.
+A simple paired-t test can check whether there is a significant difference between the left and right ear. For this test, the difference $\Delta^1_it$ is calculated between the hearing threshold of the left and right ear for each subject $i$ and at each time instance $t$ that both ears were measured (equation \@ref(eq:delta1)).
+
 \begin{equation}
-\Delta_i = \frac{(Y_{il1} - Y_{iln_{ij}}) + (Y_{ir1} - Y_{irn_{ij}})}{2}
-(\#eq:delta)
+\Delta^1_{it} = Y_{ilt} - Y_{irt}
+(\#eq:delta1)
 \end{equation}
 
-An immediate problem with this method is that we have learned the the within-group variance in the hearing threshold is quite large. Focusing only on the first and last measurement is therefore risky. Additionally, if time would influence hearing threshold, we need to correct for the time between the first and last measurement since this differs a lot between subjects. This method also requires that each subjects' both ears have been measured at least twice.
+If the focus is on the change in hearing threshold over time, we can, for instance, calculate the average change in the hearing threshold for each subject $i$, $\Delta^2_i$ as in equation \@ref(eq:delta2) where $Y_{ijk}$ is the $k^{th}$ measurement for ear $j \in \{l,r\}$ of subject $i$ and $n_{ij}$ is the total number of measurements of ear $j$ of subject $i$.
 
-An even simpler summary statistic would be to use the average hearing threshold over all measurements and both ears. This would, however, not allow us to analyse changes in individuals over time; we can only infer on the population effect between age an hearing threshold. 
+\begin{equation}
+\Delta^2_i = \frac{(Y_{il1} - Y_{iln_{il}}) + (Y_{ir1} - Y_{irn_{ir}})}{2}
+(\#eq:delta2)
+\end{equation}
 
+Alternatively, if the difference between the left and right ear is an important effect to analyse, equation \@ref(eq:delta3) shows an alternative with one summary measure for each ear $j$ of subject $i$ with at least two measurements over time. $n_{ij}$ is the total number of measurements of ear $j$ of subject $i$.
+
+\begin{equation}
+\Delta^3_{ij} = Y_{ij1} - Y_{ijn_{ij}}
+(\#eq:delta3)
+\end{equation}
+
+Equation \@ref(eq:delta2) and \@ref(eq:delta3) will allow us to see how the *evolution* of the hearing threshold differs for different age and side of the ear but will it not tell us anything about the *level* of the hearing threshold. To test whether the hearing threshold depends on age and side of the ear, equation \@ref(eq:delta4) introduces $\Delta^4_{ij}$ as the average measured hearing threshold for ear $j$ of subject $i$. $n_{ij}$ is the total number of measurements that were recorded for ear $j$ of subject $i$.
+
+\begin{equation}
+\Delta^4_{ij} = \frac{\sum_{t=1}^{t=n_{ij}} Y_{ijt}}{n_{ij}}
+(\#eq:delta4)
+\end{equation}
+
+A first, obvious problem with this method is that it does not allow us to test all hypotheses of interest in one model. Additionally, a lot of information is lost:
+
+- Only subjects with multiple measures on each ear are included in  the summary measure of  equation \@ref(eq:delta2)
+- Only ears that have been measured more than once are included in the summary measures of equation \@ref(eq:delta3) 
+- Only subjects that were measured on both ears at a certain time instance are included in the summary measures of equation \@ref(eq:delta1)
+- While the summary measures of equation \@ref(eq:delta2) and \@ref(eq:delta3) can tell us something about the evolution in the long run because it focuses on the first and last measurement, all information on the trajectory between the first and last measurement is lost.
+- Since the within-subject variability is rather large, relying on the first and last measurement as in equation \@ref(eq:delta2) and \@ref(eq:delta3) is risky.
+- Previous literature found the hearing threshold was significantly higher for the first measurement (learning effect). Relying on the first measurement as in \@ref(eq:delta2) and \@ref(eq:delta3) may be worrisome.
 
 ## Multivariate model
 
@@ -394,7 +421,125 @@ An even simpler summary statistic would be to use the average hearing threshold 
 
 ## Summary statistics
 
+```{r Delta1, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE, fig.cap="Semi-variogram", fig.width = 6, fig.height=4}
+data %>% group_by(id, TIME) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  filter(n == 2) %>%
+  right_join(data) %>%
+  pivot_wider(names_from = side, values_from = y) %>%
+  mutate(diff = left - right) -> pairedt
+paired <- t.test(x = pairedt$left, y = pairedt$right, paired = TRUE, alternative = "two.sided")
+pairedmod <- lm(diff ~ age_measurement, data = pairedt)
+pairedmod2 <- lm(diff ~ age_discrete, data = pairedt)
+#summary(pairedmod)
+#summary(pairedmod2)
+```
 
+First, a two-sided paired t-test is done, comparing the hearing threshold between the left and right ear. With a p-value of `r round(paired$p.value, 2)`, there doesn't seem to be a significant difference between the hearing threshold for the left and right ear. Simple linear regression models that relate the age (on a continuous or discrete scale) to $\Delta^1_{it}$ (equation \@ref(eq:delta1)) also did not find any significant effects.
+
+```{r Delta2, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
+data %>% group_by(id, side, age, age_discrete) %>%
+  arrange(id, side, TIME) %>%
+  summarize(n = n(),
+            diff = first(y) - last(y),
+            timediff = last(TIME) - first(TIME)) %>%
+  ungroup() %>%
+  filter(n >= 2) %>%
+  mutate(age  = age - min(age))-> #only keep those ears with at least two measurements
+  delta3
+delta3 %>% group_by(id, age, age_discrete) %>%
+  summarize(n = n(),
+            diff = mean(diff),
+            timediff = mean(timediff)) %>%
+  ungroup() %>%
+  filter(n == 2) -> #only keep those id's with a measurement for both ears
+  delta2
+
+delta3mod <- lm(diff ~ age + side + timediff, data = delta3)
+delta3mod2 <- lm(diff ~ age_discrete + side + timediff, data = delta3)
+
+delta2mod <- lm(diff ~ age + timediff, data = delta2)
+delta2mod2 <- lm(diff ~ age_discrete + timediff, data = delta2)
+s3 <- summary(delta3mod)
+s32 <- summary(delta3mod2)
+s2 <- summary(delta2mod)
+s22 <- summary(delta2mod2)
+options(knitr.kable.NA = '')
+data.frame(var = unique(c(rownames(s3$coefficients), 
+                                 rownames(s32$coefficients)))) %>%
+  left_join(data.frame(var = rownames(s3$coefficients),
+                       delta3 = s3$coefficients[,'Estimate'],
+                       delta3p = s3$coefficients[,'Pr(>|t|)'])) %>%
+  left_join(data.frame(var = rownames(s32$coefficients),
+                       delta3_2 = s32$coefficients[,'Estimate'],
+                       delta3_2p = s32$coefficients[,'Pr(>|t|)'])) %>%
+  left_join(data.frame(var = rownames(s2$coefficients),
+                       delta2 = s2$coefficients[,'Estimate'],
+                       delta2p = s2$coefficients[,'Pr(>|t|)'])) %>%
+  left_join(data.frame(var = rownames(s22$coefficients),
+                       delta2_2 = s22$coefficients[,'Estimate'],
+                       delta2_2p = s22$coefficients[,'Pr(>|t|)'])) %>%
+  mutate(delta3 = str_c(round(delta3,3), stars.pval(delta3p), sep = (" ")),
+         delta3_2 = str_c(round(delta3_2,3), stars.pval(delta3_2p), sep = (" ")),
+         delta2 = str_c(round(delta2,3), stars.pval(delta2p), sep = (" ")),
+         delta2_2 = str_c(round(delta2_2,3), stars.pval(delta2_2p), sep = (" "))) %>%
+  dplyr::select(-delta3p, -delta3_2p, -delta2p, -delta2_2p) %>%
+  rbind(c("Rsquared", round(s3$r.squared,3), round(s32$r.squared,3), 
+          round(s2$r.squared,3), round(s22$r.squared,3))) %>%
+  mutate(var = str_remove(var, "_discrete")) %>%
+  kable(caption = "Overview of the regression results for summary statistics",
+        col.names = c('Variable', '$\\Delta^{3}_{continuous}$', 
+                     '$\\Delta^{3}_{discrete}$', '$\\Delta^{2}_{continuous}$',
+                     '$\\Delta^{2}_{discrete}$'),
+        escape = FALSE,
+        booktabs = TRUE)
+
+```
+
+Next, regression models are made for $\Delta^{2}$ and $\Delta^{3}$. The variables of interest are age at the start of the study (a model with a continuous and discrete version is tested), the side of the ear (can only be tested for $\Delta^{3}$), and the time difference between the first and last measurement (see Table \@ref(tab:Delta2)). The intercept is always positive meaning the first measurement is higher than the last measurement in young subjects. This is unexpected and may be due to the learning effect that has been described in previous literature.
+Both age and the time between the first and last measurement have significantly negative coefficients meaning the difference between the first and last measurement is smaller and may even become negative for older patients with long time between the first and last measurement. There is no significant difference between the left and right ear.
+
+Lastly, Table \@ref(tab:Delta4) shows the results for two regression models based on the summary statistic of equation \@ref(eq:delta4). The age in this model refers to the age of the subject in the middle of his follow-up time (i.e. $age$ + $\frac{max(TIME)}{2}$). The intercept now represents the expected hearing threshold for the left ear of a subject that is 0 years on (in the continuous age model) or a subject that is in the youngest age category ($<30$ years old). The older the subject, the higher the expected hearing threshold. There is no significant difference between the left and right ear.
+
+```{r Delta4, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
+data %>% group_by(id, side, age, age_discrete) %>%
+  arrange(id, side, TIME) %>%
+  summarize(y = mean(y),
+            timediff = last(TIME) - first(TIME),
+            meanage = age + timediff/2,
+            meanage_discrete = cut(meanage,
+                            breaks = c(0,30,50,70,100),
+                            labels = c("<30", "30-50", "50-70",">70"))) %>%
+  ungroup() -> #only keep those ears with at least two measurements
+  delta4
+
+delta4mod <- lm(y ~ meanage + side , data = delta4)
+delta4mod2 <- lm(y ~ meanage_discrete + side , data = delta4)
+s4 <- summary(delta4mod)
+s42 <- summary(delta4mod2)
+options(knitr.kable.NA = '')
+data.frame(var = unique(c(rownames(s4$coefficients), 
+                                 rownames(s42$coefficients)))) %>%
+  left_join(data.frame(var = rownames(s4$coefficients),
+                       delta4 = s4$coefficients[,'Estimate'],
+                       delta4p = s4$coefficients[,'Pr(>|t|)'])) %>%
+  left_join(data.frame(var = rownames(s42$coefficients),
+                       delta4_2 = s42$coefficients[,'Estimate'],
+                       delta4_2p = s42$coefficients[,'Pr(>|t|)'])) %>%
+  mutate(delta4 = str_c(round(delta4,3), stars.pval(delta4p), sep = (" ")),
+         delta4_2 = str_c(round(delta4_2,3), stars.pval(delta4_2p), sep = (" "))) %>%
+  dplyr::select(-delta4p, -delta4_2p) %>%
+  rbind(c("Rsquared", round(s4$r.squared,3), round(s42$r.squared,3))) %>%
+  mutate(var = str_remove(str_remove(var, "_discrete"), "mean")) %>%
+  kable(caption = "Overview of the regression results for summary statistics",
+        col.names = c('Variable', '$\\Delta^{4}_{continuous}$', 
+                     '$\\Delta^{4}_{discrete}$'),
+        escape = FALSE,
+        booktabs = TRUE)
+
+
+```
 
 ## Multivariate model
 
