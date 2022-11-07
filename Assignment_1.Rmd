@@ -384,14 +384,14 @@ A simple paired-t test can check whether there is a significant difference betwe
 If the focus is on the change in hearing threshold over time, we can, for instance, calculate the average change in the hearing threshold for each subject $i$, $\Delta^2_i$ as in equation \@ref(eq:delta2) where $Y_{ijk}$ is the $k^{th}$ measurement for ear $j \in \{l,r\}$ of subject $i$ and $n_{ij}$ is the total number of measurements of ear $j$ of subject $i$.
 
 \begin{equation}
-\Delta^2_i = \frac{(Y_{il1} - Y_{iln_{il}}) + (Y_{ir1} - Y_{irn_{ir}})}{2}
+\Delta^2_i = \frac{(Y_{iln_{il}} - Y_{il1} ) + (Y_{irn_{ir}} - Y_{ir1})}{2}
 (\#eq:delta2)
 \end{equation}
 
 Alternatively, if the difference between the left and right ear is an important effect to analyse, equation \@ref(eq:delta3) shows an alternative with one summary measure for each ear $j$ of subject $i$ with at least two measurements over time. $n_{ij}$ is the total number of measurements of ear $j$ of subject $i$.
 
 \begin{equation}
-\Delta^3_{ij} = Y_{ij1} - Y_{ijn_{ij}}
+\Delta^3_{ij} = Y_{ijn_{ij}} - Y_{ij1} 
 (\#eq:delta3)
 \end{equation}
 
@@ -414,6 +414,9 @@ A first, obvious problem with this method is that it does not allow us to test a
 ## Multivariate model
 
 ## Two-stage analysis
+
+In a two-stage analysis, subject-specific intercepts, time effects and quadratic time effects are first estimated. In the second step, these subject-specific parameters are analysed and related to additional covariates such as the age and the side of the ear.
+
 
 ## Random-effects model
 
@@ -442,7 +445,7 @@ First, a two-sided paired t-test is done, comparing the hearing threshold betwee
 data %>% group_by(id, side, age, age_discrete) %>%
   arrange(id, side, TIME) %>%
   summarize(n = n(),
-            diff = first(y) - last(y),
+            diff = last(y) - first(y),
             timediff = last(TIME) - first(TIME)) %>%
   ungroup() %>%
   filter(n >= 2) %>%
@@ -497,8 +500,8 @@ data.frame(var = unique(c(rownames(s3$coefficients),
 
 ```
 
-Next, regression models are made for $\Delta^{2}$ and $\Delta^{3}$. The variables of interest are age at the start of the study (a model with a continuous and discrete version is tested), the side of the ear (can only be tested for $\Delta^{3}$), and the time difference between the first and last measurement (see Table \@ref(tab:Delta2)). The intercept is always positive meaning the first measurement is higher than the last measurement in young subjects. This is unexpected and may be due to the learning effect that has been described in previous literature.
-Both age and the time between the first and last measurement have significantly negative coefficients meaning the difference between the first and last measurement is smaller and may even become negative for older patients with long time between the first and last measurement. There is no significant difference between the left and right ear.
+Next, regression models are made for $\Delta^{2}$ and $\Delta^{3}$. The variables of interest are age at the start of the study (a model with a continuous and discrete version is tested), the side of the ear (can only be tested for $\Delta^{3}$), and the time difference between the first and last measurement (see Table \@ref(tab:Delta2)). The intercept is always negative meaning the first measurement is higher than the last measurement in young subjects. This is unexpected and may be due to the learning effect that has been described in previous literature.
+Both age and the time between the first and last measurement have significantly positive coefficients meaning the difference between the first and last measurement is larger and may even become positive for older patients with long time between the first and last measurement. There is no significant difference between the left and right ear.
 
 Lastly, Table \@ref(tab:Delta4) shows the results for two regression models based on the summary statistic of equation \@ref(eq:delta4). The age in this model refers to the age of the subject in the middle of his follow-up time (i.e. $age$ + $\frac{max(TIME)}{2}$). The intercept now represents the expected hearing threshold for the left ear of a subject that is 0 years on (in the continuous age model) or a subject that is in the youngest age category ($<30$ years old). The older the subject, the higher the expected hearing threshold. There is no significant difference between the left and right ear.
 
@@ -545,11 +548,110 @@ data.frame(var = unique(c(rownames(s4$coefficients),
 
 ## Two-stage analysis
 
+As previous analyses showed that individuals may have a different time effect, the two-stage analysis first fit individual-specific intercept, time effect (slope), and *firsttime* learning effect. As all previous analyses did not uncover a significant effect of the side of the ear, it is no longer considered in this analysis.
+
+The first stage analysis fits the model in equation \@ref(eq:firststage). Next, the first stage results are used in the second stage (equation \@ref(eq:secondstage)) to relate the estimated subject-specific parameters to age.
+
+\begin{equation}
+Y_{ij} = \beta_{1i} + \beta_{2i}TIME_{ij} + \beta_{3i}\text{firsttime}_{ij} +\varepsilon_{ij} \quad j = 1,....,n_i
+(\#eq:firststage)
+\end{equation}
+
+\begin{equation}
+\left\{
+                \begin{array}{ll}
+                  \beta_{1i} = \beta_{0} + \beta_{1}age_i + b_{1i}\\
+                  \beta_{2i} = \beta_{2} + \beta_{3}age_i + b_{2i}\\
+                  \beta_{3i} = \beta_{4} + \beta_{5}age_i + b_{3i}
+                \end{array}
+              \right.
+(\#eq:secondstage)
+\end{equation}
+
+```{r twostage, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
+#tested models
+#y ~ 1 + TIME + TIME2 --> age is only significant for the intercept in the second stage
+#y ~ 1 + TIME + TIME2 + firsttime --> age is only significant for the intercept in the second stage
+#y ~ 1 + TIME + firsttime --> age is a significant predictor for the intercept and time
+#y ~ 1 + firsttime --> age is significant for intercept and firsttime
+#y ~ 1 + TIME  --> age is significant for intercept and TIME
+
+stage1 <- data %>% 
+  mutate(TIME2 = TIME*TIME,
+         firsttime = 1*(TIME == 0)) %>%
+  group_by(id) %>%
+  filter(n_distinct(TIME) > 1) %>%#only keep id with measures on at least 2 time instances
+  do(model = lm(y ~ 1 + TIME + firsttime, data = .)) %>%
+  ungroup() %>%
+  mutate(intercept = unlist(model$model)$`coefficients.(Intercept)`)
+stage1.results <- stage1 %>% dplyr::select(id) %>%
+  mutate(intercept = sapply(
+    X = 1:nrow(stage1), 
+    FUN = function(x){
+      unlist(
+        stage1[x,"model"]$model)$`coefficients.(Intercept)`}),
+    TIME = sapply(
+      X = 1:nrow(stage1),
+      FUN = function(x){
+        unlist(
+          stage1[x,"model"]$model)$`coefficients.TIME`}),
+    # TIME2 = sapply(
+    #   X = 1:nrow(stage1),
+    #   FUN = function(x){
+    #     unlist(
+    #       stage1[x,"model"]$model)$`coefficients.TIME2`}),
+    firsttime = sapply(
+      X = 1:nrow(stage1),
+      FUN = function(x){
+        unlist(
+          stage1[x,"model"]$model)$`coefficients.firsttime`})
+    ) %>%
+  left_join(data[,c('id', 'age')] %>%
+              group_by(id, age) %>%
+              slice(1))
+
+#stage2
+stage2 <- lapply(
+  X = c("intercept", "TIME", "firsttime"),
+  FUN = function(x){
+    summary(lm(as.formula(paste(x,"~age")), data = stage1.results))}
+)
+data.frame(
+  model = c('Intercept', "TIME", "firsttime"),
+  intercept = 
+    sapply(X = 1:length(stage2), FUN =
+             function(x){
+               paste(
+                 round(stage2[[x]]$coefficients["(Intercept)","Estimate"],3),
+                 " ", 
+                 stars.pval(stage2[[x]]$coefficients["(Intercept)","Pr(>|t|)"])
+               )
+               }),
+  age = 
+    sapply(X = 1:length(stage2), FUN =
+             function(x){
+               paste(
+                 round(stage2[[x]]$coefficients["age","Estimate"],3),
+                 " ", 
+                 stars.pval(stage2[[x]]$coefficients["age","Pr(>|t|)"])
+               )
+               })
+) %>%
+  kable(booktabs = TRUE,
+        caption = "Second-stage results")
+```
+
+Table \@ref(tab:twostage) shows the results for the second stage. The first row shows estimates for $\beta_0$ and $\beta_1$. The estimated intercept for a person that is 0 years old is `r round(stage2[[1]]$coefficients["(Intercept)","Estimate"],3)`dB and increases by `r round(stage2[[1]]$coefficients["age","Estimate"],3)`dB for each life year. The expected slope also significantly increases with age (`r paste(round(stage2[[2]]$coefficients["age","Estimate"],3), " ",  stars.pval(stage2[[2]]$coefficients["age","Pr(>|t|)"]))`).
+
 ## Random-effects model
 
 # Discussion and conclusion
 
-## further research
+## Further research
+
+suggestions for future study; fixed times for balanced data
+
+future research: a different covariance structure for older/younger people.
 
 # Bibliography
 
