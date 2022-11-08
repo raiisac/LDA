@@ -413,12 +413,16 @@ A first, obvious problem with this method is that it does not allow us to test a
 
 ## Multivariate model
 
+A multivariate model is constructed and we find the most parsimonious mean structure for it. Given the unbalanced data set, the [*gee*](https://cran.r-project.org/web/packages/gee/) and [*geepack*](https://cran.r-project.org/web/packages/geepack/) packages are used to conduct Generalized Estimating Equations. We will conduct these under the strict assumptions of normality and independence between observations of the same individual. We will compare models using Quasi-Information Criterium (QIC), the RMSE of the fitted residuals, and `ANOVA\MANOVA` tests. After some model searching in order to select the most parsimonious mean structure we will take care of selecting the appropriate covariance structure. 
+
 ## Two-stage analysis
 
 In a two-stage analysis, subject-specific intercepts, time effects and quadratic time effects are first estimated. In the second step, these subject-specific parameters are analysed and related to additional covariates such as the age and the side of the ear.
 
 
 ## Random-effects model
+
+Lastly, a random-effects model is fit. This model is similar to the two-stage model but both stages are now combined in one model. We use the [*glmmTMB*](https://cran.r-project.org/web/packages/glmmTMB/) / [*lme4*](https://cran.r-project.org/web/packages/lme4/) ????which one???? packages in R to fit the models.
 
 # Results
 
@@ -648,10 +652,9 @@ Table \@ref(tab:twostage) shows the results for the second stage. The first row 
 # Discussion and conclusion
 
 ## Further research
+The fact that the data set is unbalanced, complicates the analysis significantly. Inviting the subjects to the clinic for a hearing test at fixed time instances and consistently measuring both ears in each visit can alleviate these problems. 
 
-suggestions for future study; fixed times for balanced data
-
-future research: a different covariance structure for older/younger people.
+For future research, a different covariance structure for older/younger people.
 
 # Bibliography
 
