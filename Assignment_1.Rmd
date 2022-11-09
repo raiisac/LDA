@@ -22,6 +22,8 @@ library(rprojroot)
 library(patchwork)
 library(psych)
 library(gtools)
+library(geepack)
+library(gee)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -370,7 +372,7 @@ if (!file.exists(find_root_file("data/variogram.pdf",
 }
 knitr::include_graphics("data/variogram.pdf")
 ```
-Lastly, a semi-variogram is constructed using the [*joineR* package](https://rdrr.io/cran/joineR/) (Figure \@ref(fig:variogram)). The total variance is estimated to be `r round(vgm$sigma2,2)`. Measurement error is approximately `r round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)`, the serial correlation component is approximately `r round(mean(vgm$svar[vgm$svar[,1]==21,2]),2) - round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)` and the between-subject variability is thus `r round(vgm$sigma2 - mean(vgm$svar[vgm$svar[,1]==21,2]),2)`.
+Lastly, a semi-variogram is constructed using the [*joineR* package](https://rdrr.io/cran/joineR/). The total variance is estimated to be `r round(vgm$sigma2,2)`. Measurement error is approximately `r round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)`, the serial correlation component is approximately `r round(mean(vgm$svar[vgm$svar[,1]==21,2]),2) - round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)` and the between-subject variability is thus `r round(vgm$sigma2 - mean(vgm$svar[vgm$svar[,1]==21,2]),2)`.
 
 
 # Methodology
@@ -426,7 +428,7 @@ MAD = MEDIAN(|Y_{ijk}-\overline{Y_{ij}}|)
 \end{equation}
 
 \begin{equation}
-SPY = \frac{Y_{ijk_max}-Y_{ij0}}{Trial Duration}
+SPY = \frac{Y_{ijk_{max}}-Y_{ij1}}{Trial Duration}
 \end{equation}
 
 The goal here is to see if patients of an older age or patients with a longer study period have larger degrees of variability in their hearing capacity. Examination of this relation could pose to provide insight into the nature of how hearing capability evolves over time. A positive relation between these metrics and a patients' starting age, in addition to their time spent in the study, would imply that hearing capabilities of older people have a more pronounced evolution compared to those of younger people. These variability measurements were taken in respect to both the left and right ears and then analyzed via an ANCOVA model. 
@@ -574,7 +576,6 @@ data.frame(var = unique(c(rownames(s4$coefficients),
 Table \@ref(tab:madspy) details the results of the ANCOVA where the variance of the hearing capabilities. In agreement with the previously derived summary statistics, the starting age of the patient as well as their time spent within the study both have an effect on the MAD and SPY statistics. In further agreement with past results the side of the ear remains unimportant when inferring the expected periodic change of subjects’ hearing capabilities. From these results it can be stated that both age and the time spent within the study have a positive effect on the observed variance of the measured response. As was in the case with previous analyses, these results imply a potentially large shift in hearing capabilities over time. As was the case with previous analyses, their does not appear to be a significant difference between the two ears.
 
 ```{r madspy, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
-library(aTSA)
 library(tseries)
 library(car)
 data.right=data[data$side=="right",]
@@ -676,6 +677,92 @@ data.frame(Variable = rownames(Ancova.SPY),
 ```
 
 ## Multivariate model
+
+We find that the model $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk}$ is the most parsimonious model. We further find that the effect of the *side* variable does not significantly influence the hearing threshold. These conclusions hold for a much wider selection of models (we present here only sample of what we tested) or even when we filter the data under different conditions (Removing subjects with less than $n=\{2,4,5,6\}$ observations,looking at only the right/left ear, treating each ear-subject pair as single subject, balancing the data, grouping the subjects in cohorts of $\{1,5,10,15,20\}$ years and creating dummy variables for them).
+
+```{r warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
+mf <- formula(y ~ age+TIME+side+age:TIME+age:side+TIME:side)
+gee1 <- geeglm(mf, data = data, id = id, corstr = "independence")
+sgee1 <- coef(summary(gee1)) %>% as.data.frame %>%
+  mutate(var= rownames(coef(summary(gee1))),
+         gee1 = sprintf("%s%s",round(Estimate,3), stars.pval(`Pr(>|W|)`)))
+# QIC(gee1)[2]
+# mean(sqrt(resid(gee1)^2))
+# coef(summary(gee1))
+
+# mf2 <- formula(y ~ age + TIME + I(age^2) + learning)
+# gee2 <- geeglm(mf2, data=data, id=id, corstr="independence")
+# sgee2 <- coef(summary(gee2)) %>% as.data.frame %>%
+#   mutate(var= rownames(coef(summary(gee2))),
+#          gee2 = sprintf("%s%s",round(Estimate,3), stars.pval(`Pr(>|W|)`)))
+mf2 <- formula(y ~ age*TIME + learning + I(age^2))
+gee2 <- geeglm(mf2, data = data, id = id, corstr = "independence")
+sgee2 <- coef(summary(gee2)) %>% as.data.frame %>%
+  mutate(var = rownames(coef(summary(gee2))),
+         gee2 = sprintf("%s%s",round(Estimate,3), stars.pval(`Pr(>|W|)`)))
+# QIC(gee2)[2]
+# mean(sqrt(resid(gee2)^2))
+# coef(summary(gee2))
+mf3 <- formula(y ~ age*TIME + I(age^2))
+gee3 <- geeglm(mf3, data = data, id = id, corstr = "independence")
+sgee3 <- coef(summary(gee3)) %>% as.data.frame %>%
+  mutate(var = rownames(coef(summary(gee3))),
+         gee3 = sprintf("%s%s",round(Estimate,3), stars.pval(`Pr(>|W|)`)))
+
+# QIC(gee3)[2]
+# mean(sqrt(resid(gee3)^2))
+# coef(summary(gee3))
+
+mf4 <- formula(y ~ age+TIME)
+gee4 <- geeglm(mf4, data = data, id = id, corstr = "independence")
+sgee4 <- coef(summary(gee4)) %>% as.data.frame %>%
+  mutate(var = rownames(coef(summary(gee4))),
+         gee4 = sprintf("%s%s",round(Estimate,3), stars.pval(`Pr(>|W|)`)))
+
+# QIC(gee4)[2]
+# mean(sqrt(resid(gee4)^2))
+# coef(summary(gee4))
+
+mf5 <- formula(y ~ age)
+gee5 <- geeglm(mf5, data = data, id = id, corstr = "independence")
+sgee5 <- coef(summary(gee5)) %>% as.data.frame %>%
+  mutate(var = rownames(coef(summary(gee5))),
+         gee5 = sprintf("%s%s",round(Estimate,3), stars.pval(`Pr(>|W|)`)))
+
+# QIC(gee5)[2]
+# mean(sqrt(resid(gee5)^2))
+# coef(summary(gee5))
+#anova results --> model 2 is the best
+# anova(gee1, gee4)
+# anova(gee5, gee4)
+# anova(gee2, gee3)
+# anova(gee4, gee3)
+# anova(gee4, gee5)
+data.frame(
+  var = unique(c(sgee2$var, sgee1$var))) %>%
+  left_join(sgee1[,c('var','gee1')]) %>%
+  left_join(sgee2[,c('var','gee2')]) %>%
+  left_join(sgee3[,c('var','gee3')]) %>%
+  left_join(sgee4[,c('var','gee4')]) %>%
+  left_join(sgee5[,c('var','gee5')]) %>%
+  rbind(c('QIC', round(QIC(gee1)[2],2), round(QIC(gee2)[2],2), 
+          round(QIC(gee3)[2],2), round(QIC(gee4)[2],2), round(QIC(gee5)[2],2))) %>%
+  rbind(c("RMSE", round(mean(sqrt(resid(gee1)^2)),2), round(mean(sqrt(resid(gee1)^2)),2),
+        round(mean(sqrt(resid(gee3)^2)),2),round(mean(sqrt(resid(gee4)^2)),2),
+        round(mean(sqrt(resid(gee5)^2)),2))) %>%
+  kable(booktabs = TRUE,
+        caption = "Comparison of multivariate models",
+        col.names = c("", "model1", "model2", "model3", "model4", "model5")) %>%
+  kableExtra::row_spec(9, hline_after = TRUE) %>%
+  kableExtra::row_spec(10, hline_after = TRUE)
+```
+
+Now we will take a look at alternative ways to optimize our models. The covariance structure of the model denotes the observed relation between the model variables. Certain structures may lead to a stronger model fit, whereas others are inappropriate given the nature of our data. We will compare the same model mean structure i.e. $Y_{ijk} = age_{i} + TIME_{jk}$ under different covariance structures and evaluate them according to Quasi Information Criterion (`QIC`) value. This is a performance metric which details the relative performance between a set of models. 
+
+It appears that a covariance structure that assumes independence across the variables produces the lowest `QIC` value, nevertheless it behooves us to take a closer look at these two models. First let's consider the model with a covariance structure that assumes equal covariances between variables with equivalent variances (compound symmetry). 
+
+In the above output we notice that we get two standard errors: Naive and Robust. Normally we would want to use the Robust estimates because the variances of coefficient estimates tend to be too small when responses within subjects are correlated (Bilder and Loughin, 2015), however in this case there is little difference between the Naive and Robust estimates. This further suggests that the independence assumption of the correlation structure seems realistic (Hothorn and Everitt, 2014). In the bottom we see a `Working correlation` output which shows the upper $4\times 4$ of the Variance-Covariance matrix used for this model (the size depends on the number of observations per individual with the largest beeing $29\times 29$ ). Below we will report the best model we could find under the conditions of this task. It has the same parameter estimates as a least squares model with the same mean structure specification, however the robust errors in this model are more accurate, as some of the conditions of the least squares model are not fulfilled (e.g. Normally distributed residuals)
+
 
 ## Two-stage analysis
 
@@ -784,6 +871,12 @@ data.frame(
 Table \@ref(tab:twostage) shows the results for the second stage. The first row shows estimates for $\beta_0$, $\beta_1$ and $\beta_2$. The estimated hearing threshold on the first visit for a person that is 0 years old is `r round(stage2[[1]]$coefficients["(Intercept)","Estimate"],3)` `r round(stage2[[3]]$coefficients["(Intercept)","Estimate"],3)` =  `r round(stage2[[1]]$coefficients["(Intercept)","Estimate"] + stage2[[3]]$coefficients["(Intercept)","Estimate"],3)`dB and increases exponentially for each life year age$^2$ is highly significant. The expected slope increases with age (`r paste(round(stage2[[2]]$coefficients["age","Estimate"],3), " (p-value of",  round(stage2[[2]]$coefficients["age","Pr(>|t|)"],3), ")")`).
 
 ## Random-effects model
+```{r mixed, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
+mixed <- nlme::lme(y ~ age*TIME + learning + I(age^2), data= data, 
+                   random = ~1+TIME|id/side)
+s <- summary(mixed)
+```
+
 
 # Discussion and conclusion
 
