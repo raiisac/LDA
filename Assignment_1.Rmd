@@ -678,7 +678,7 @@ data.frame(Variable = rownames(Ancova.SPY),
 
 ## Multivariate model
 
-We find that the model $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk}$ performs really well and is congruent with what has been found before in the literature (model 2 in Table \@ref(tab:multivariate-mean)). We further find that the effect of the *side* variable does not significantly influence the hearing threshold. These conclusions hold for a much wider selection of models (we present here only sample of what we tested) or even when we filter the data under different conditions (Removing subjects with less than $n=\{2,4,5,6\}$ observations, looking at only the right/left ear, treating each ear-subject pair as single subject, balancing the data, grouping the subjects in cohorts of $\{1,5,10,15,20\}$ years and creating dummy variables for them).
+We find that the model $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk} + age_{ij} * TIME_{ijk}$ performs really well and is congruent with what has been found before in the literature (model 2 in Table \@ref(tab:multivariate-mean)). We further find that the effect of the *side* variable does not significantly influence the hearing threshold. These conclusions hold for a much wider selection of models (we present here only sample of what we tested) or even when we filter the data under different conditions (Removing subjects with less than $n=\{2,4,5,6\}$ observations, looking at only the right/left ear, treating each ear-subject pair as single subject, balancing the data, grouping the subjects in cohorts of $\{1,5,10,15,20\}$ years and creating dummy variables for them).
 
 ```{r multivariate-mean, warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
 mf <- formula(y ~ age+TIME+side+age:TIME+age:side+TIME:side)
@@ -908,7 +908,7 @@ Table \@ref(tab:twostage) shows the results for the second stage. The first row 
 
 ## Random-effects model
 
-Using what we have learned from the previous sections, and after test several models for the mean structure, we end up with the model $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk}$ with a random slope and random intercept with $id$ and $side$ as grouping variables (although there was no overall population effect of $side$, it appears that some peoples' left ear consistently scores better/worse than their right ear).
+Using what we have learned from the previous sections, and after test several models for the mean structure, we end up with the model $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk} + age_{ij} * TIME_{ijk}$ with a random slope and random intercept with $id$ and $side$ as grouping variables (although there was no overall population effect of $side$, it appears that some peoples' left ear consistently scores better/worse than their right ear).
 
 ```{r mixedfixed, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
 mixed <- nlme::lme(y ~ age*TIME + learning + I(age^2), data = data, 
@@ -929,14 +929,15 @@ dat_mixed5 <- data.frame(time = data$TIME,
                        pred = fitted(mixed),
                        Subject = data$id,
                        side = data$side) %>%
-  left_join(data[,c("age", "id")], by = c("Subject" = "id"))
+  left_join(data[,c("age", "age_discrete","id")], by = c("Subject" = "id"))
   
 dat_mixed5$Subject <- as.numeric(dat_mixed5$Subject)
 #dat_mixed5<-dat_mixed5 %>% filter(side=="right")
 ggplot(data = dat_mixed5, aes(x = time, y = pred, color = age, 
                               shape = side, group = interaction(Subject, side))) + 
   theme_classic() +
-  geom_line(alpha = 0.5) + geom_point(alpha = 0.5, size = 1)
+  geom_line(alpha = 0.5) + geom_point(alpha = 0.5, size = 1) + 
+  ylab ("Hearing threshold") + facet_wrap(facets = vars(age_discrete))
 ```
 
 Further we need to check two assumptions of our model, first that the model error terms follow a normal distribution and secondly the betas for subject [i] also follow a normal distribution. As can be seen in the QQ-plots below this is not necessarily the case for our model. Naturally we could improve on this first by removing outliers which have the highest impact. Secondly we could add additional quadratic terms in TIME and a dummy variable for whether they are above the age of 55. Finally, we can implement a compound symmetric covariance structure to the model. All of these measures improve QQ-plots, nevertheless we did not implement them as both the information criterions got worse and we felt the model became too overfitted and more difficult to interpret.
@@ -957,7 +958,7 @@ qqline(qres)
 
 # Discussion and conclusion
 
-We observe that on average men’s hearing degrades as they get older, especially after 50 years of age. Men increase their hearing threshold  from the age of about 20 years old and the speed of hearing loss increases as the subjects get older. We do not see any difference between the left and right ear.
+We observe that on average men’s hearing degrades as they get older, especially after 50 years of age. Men's hearing thresholds increase over time from the age of about 20 years old and the speed of hearing loss increases as the subjects get older. We do not see any difference between the left and right ear.
 As was seen in the literature, we also observed a learning effect; subjects' hearing threshold is expected to be about 1dB higher the first time they get their hearing threshold measured.
 Further we see that people with very good hearing to begin with are more sensitive to hearing loss as we see a slight negative correlation between random slopes and intercepts (-0.183).
 
