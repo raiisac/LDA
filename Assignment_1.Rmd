@@ -918,10 +918,42 @@ mixedcomp <- nlme::lme(y ~ age*TIME + learning + I(age^2), data = data,
                    random = ~1+TIME|id/side,
                    cor = nlme::corCompSymm())
 mixed
-
 ```
 
-After having selected the mean structure of the model we need to select the appropriate covariance structure. We do so using a number of measures first with the help of our theoretical understanding, then using the AIC/QIC. Theoretical understanding helps us narrow the number of structures we need to test, for example Autoregressive or Toeplitz type structures are automatically excluded due to irregularities in the time intervals between measurements. For models (mixed model) which use the maximum likelihood we use the AIC. Although the AIC is normally used to select the optimal model using the likelihood and penalizing the number of parameters, we use it to select the covariance structure. That is while holding the parameters the same but changing the covariance structure we see a decrease in the AIC only as a result of a higher likelihood. The same is done with the QIC but for models which use the Quasi maximum Likelihood. We observe that in the mixed model a simple covariance structure has better performance (AIC = `r AIC(mixed)`) than using compound symmetry (AIC = `r AIC(mixedcomp)`).
+After having selected the mean structure of the model we need to select the appropriate covariance structure. We do so using a number of measures first with the help of our theoretical understanding, then using the AIC/QIC. Theoretical understanding helps us narrow the number of structures we need to test, for example Autoregressive or Toeplitz type structures are automatically excluded due to irregularities in the time intervals between measurements. For models (mixed model) which use the maximum likelihood we use the AIC. Although the AIC is normally used to select the optimal model using the likelihood and penalizing the number of parameters, we use it to select the covariance structure. That is while holding the parameters the same but changing the covariance structure we see a decrease in the AIC only as a result of a higher likelihood. The same is done with the QIC but for models which use the Quasi maximum Likelihood. We observe that in the mixed model a simple covariance structure has better performance (AIC = `r round(AIC(mixed),2)`) than using compound symmetry (AIC = `r round(AIC(mixedcomp),2)`).
+
+We see that the average hearing threshold at the first visit is 5.57+1.04 = 6.6dB for a subject that is 0 years old. The trend in the hearing threshold is dependent on age. For a 20-year old, we expect an increase of -0.24 + 20*0.0123 = 0.006dB per year. For a 50-year old, we expect an increase in the hearing threshold of 0.375dB per year. We further see that there is a large variability in the intercepts (the standard error is 6.79 ). Also intercepts and slopes appear to be correlated -0.183 which leads us to believe that people with better hearing to begin with are more sensitive to hearing loss (or simply have more hearing to lose). The predicted profiles for each subjects' ears can be found in Figure \@ref(fig:mixedfixedprofiles).
+
+```{r mixedfixedprofiles, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE, fig.cap="Predicted profiles from the final mixed model."}
+dat_mixed5 <- data.frame(time = data$TIME,
+                       pred = fitted(mixed),
+                       Subject = data$id,
+                       side = data$side) %>%
+  left_join(data[,c("age", "id")], by = c("Subject" = "id"))
+  
+dat_mixed5$Subject <- as.numeric(dat_mixed5$Subject)
+#dat_mixed5<-dat_mixed5 %>% filter(side=="right")
+ggplot(data = dat_mixed5, aes(x = time, y = pred, color = age, 
+                              shape = side, group = interaction(Subject, side))) + 
+  theme_classic() +
+  geom_line(alpha = 0.5) + geom_point(alpha = 0.5, size = 1)
+```
+
+Further we need to check two assumptions of our model, first that the model error terms follow a normal distribution and secondly the betas for subject [i] also follow a normal distribution. As can be seen in the QQ-plots below this is not necessarily the case for our model. Naturally we could improve on this first by removing outliers which have the highest impact. Secondly we could add additional quadratic terms in TIME and a dummy variable for whether they are above the age of 55. Finally, we can implement a compound symmetric covariance structure to the model. All of these measures improve QQ-plots, nevertheless we did not implement them as both the information criterions got worse and we felt the model became too overfitted and more difficult to interpret.
+
+
+```{r mixedfixedqqplot, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
+#assumptions check 
+#1. Error terms follow a Normal Distribution
+#2. Beta for subject i follows a Normal Distribution
+qint<-nlme::ranef(mixed)$id[["(Intercept)"]]
+qres<-residuals(mixed)
+par(mfrow=c(1,2))
+qqnorm(qint,ylab = "Estimated Random Intecepts",main = "Random Intecepts")
+qqline(qint)
+qqnorm(qres,ylab = "Estimated Residuals",main = "Residuals")
+qqline(qres)
+```
 
 # Discussion and conclusion
 

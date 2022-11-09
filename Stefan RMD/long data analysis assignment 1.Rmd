@@ -105,6 +105,9 @@ anova(gee1,gee5)
 #anova(gee3,gee6)
 
 anova(gee4,gee5)
+anova(gee4,gee6)
+anova(gee4,gee7)
+anova(gee6,gee7)
 #anova(gee4,gee6)
 
 #anova(gee5,gee6)
