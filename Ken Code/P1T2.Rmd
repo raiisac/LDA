@@ -5,10 +5,17 @@ date: "10/26/2022"
 output: html_document
 ---
 
+\begin{equation}
+MAD = MEDIAN(|Y_{ijk}-\overbar{Y_{ij}}|)
+(\#eq:delta5)
+\end{equation}
+
 
 ```{r}
 library(sas7bdat)
 library(tidyverse)
+library(car)
+library(tseries)
 ```
 
 ```{r}
@@ -24,7 +31,7 @@ data.left=data[data$side=="left",]
 
 AUC right
 ```{r}
-groupsize.right=data.right%>%group_by(id)%>%summarise(gs=n())%>%filter(gs>1)
+groupsize.right=data.right%>%group_by(id)%>%summarise(gs=n(),age=mean(age))%>%filter(gs>1)
 
 AUCS.right=c()
 
@@ -48,7 +55,7 @@ groupsize.right$aucs.right=AUCS.right
 
 AUC left
 ```{r}
-groupsize.left=data.left%>%group_by(id)%>%summarise(gs=n())%>%filter(gs>1)
+groupsize.left=data.left%>%group_by(id)%>%summarise(gs=n(),age=mean(age))%>%filter(gs>1)
 
 AUCS.left=c()
 
@@ -72,20 +79,155 @@ groupsize.left$aucs.left=AUCS.left
 
 ```{r}
 fulljoin=full_join(groupsize.left,groupsize.right,by="id")
-fulljoin$auc.ratio=fulljoin$aucs.right/fulljoin$aucs.left
+fulljoin$auc.ratio=fulljoin$aucs.left/fulljoin$aucs.right
+fulljoin$auc.ratio
+```
+
+```{r}
+fulljoin%>%ggplot(aes(id,auc.ratio,colour=age.x))+
+  geom_point()+
+  scale_y_continuous(trans="log2")
 ```
 
 Increments
 ```{r}
-data.right$y.std=data.right$y
+data.right$y.inc=data.right$y
 for(i in unique(data.right$id)){
-  data.right$y.std[data.right$id==i]=data.right$y[data.right$id==i]-data.right$y[data.right$id==i][1]
+  data.right$y.inc[data.right$id==i]=data.right$y[data.right$id==i]-data.right$y[data.right$id==i][1]
 }
 ```
 
 ```{r}
-data.left$y.std=data.left$y
+data.left$y.inc=data.left$y
 for(i in unique(data.left$id)){
-  data.left$y.std[data.left$id==i]=data.left$y[data.left$id==i]-data.left$y[data.left$id==i][1]
+  data.left$y.inc[data.left$id==i]=data.left$y[data.left$id==i]-data.left$y[data.left$id==i][1]
 }
+```
+
+```{r}
+right.idsum=data.right%>%
+  group_by(id)%>%
+  summarise(count=n(),idsd=sd(y),
+            idmad=mad(y),
+            idfirst=first(y),
+            idlast=last(y),
+            SPY=(last(y)-first(y))/max(TIME), #steps per year
+            StartingAge=min(age),
+            duration=max(TIME),
+            side=first(side))%>%
+  filter(is.na(SPY)==F)
+
+adf=c()
+for (i in unique(right.idsum$id)){
+  if(nrow(data.right[data.right$id==i,])>4){
+    adf=append(adf,adf.test(data.right[data.right$id==i,]$y)[4][[1]])
+  }
+  else
+    adf=append(adf,NaN)
+}
+right.idsum$adf=adf
+right.idsum
+```
+
+
+```{r}
+left.idsum=data.left%>%
+  group_by(id)%>%
+  summarise(count=n(),idsd=sd(y),
+            idmad=mad(y),
+            idfirst=first(y),
+            idlast=last(y),
+            SPY=(last(y)-first(y))/max(TIME), #steps per year
+            StartingAge=min(age),
+            duration=max(TIME),
+            side=first(side))%>%
+  filter(is.na(SPY)==F)
+
+adf=c()
+for (i in unique(left.idsum$id)){
+  if(nrow(data.left[data.left$id==i,])>4){
+    adf=append(adf,adf.test(data.left[data.left$id==i,]$y)[4][[1]])
+  }
+  else
+    adf=append(adf,NaN)
+}
+left.idsum$adf=adf
+left.idsum
+```
+
+```{r}
+Anova(aov(idsd~StartingAge*duration,data=right.idsum),type="III")
+```
+
+```{r}
+Anova(aov(idsd~StartingAge*duration,data=left.idsum),type="III")
+```
+
+
+aov steps per year vs starting age + duration right ear
+```{r}
+Anova(aov(SPY~StartingAge*duration,data=right.idsum),type="III")
+```
+
+aov steps per year vs starting age + duration left ear
+```{r}
+Anova(aov(SPY~StartingAge*duration,data=left.idsum),type="III")
+```
+
+```{r}
+Anova(aov(idmad~StartingAge*duration,data=right.idsum),type="III")
+```
+
+```{r}
+Anova(aov(idsd~StartingAge*duration,data=right.idsum),type="III")
+```
+
+```{r}
+Anova(aov(idmad~duration,data=left.idsum))
+```
+
+```{r}
+Anova(aov(idsd~duration,data=left.idsum))
+```
+
+```{r}
+Anova(aov(SPY~StartingAge*duration,data=right.idsum))
+```
+
+```{r}
+Anova(aov(SPY~StartingAge*duration,data=left.idsum))
+```
+
+```{r}
+Anova(aov(idmad~StartingAge*duration,data=right.idsum),type="III")
+```
+
+```{r}
+Anova(aov(idmad~StartingAge*duration,data=left.idsum),type="III")
+```
+
+```{r}
+both.idsum=rbind(right.idsum,left.idsum)
+```
+
+```{r}
+Anova(aov(idmad~StartingAge+duration+side,data=both.idsum),type="III")
+```
+
+```{r}
+Anova(aov(SPY~StartingAge+duration+side,data=both.idsum),type="III")
+```
+
+```{r}
+summary(lm(idmad~StartingAge+duration+side,data=both.idsum))
+```
+
+```{r}
+summary(lm(SPY~StartingAge+duration+side,data=both.idsum))
+```
+
+
+
+```{r}
+
 ```
