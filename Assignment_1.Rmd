@@ -924,7 +924,7 @@ After having selected the mean structure of the model we need to select the appr
 
 We see that the average hearing threshold at the first visit is 5.57+1.04 = 6.6dB for a subject that is 0 years old. The trend in the hearing threshold is dependent on age. For a 20-year old, we expect an increase of -0.24 + 20*0.0123 = 0.006dB per year. For a 50-year old, we expect an increase in the hearing threshold of 0.375dB per year. We further see that there is a large variability in the intercepts (the standard error is 6.79 ). Also intercepts and slopes appear to be correlated -0.183 which leads us to believe that people with better hearing to begin with are more sensitive to hearing loss (or simply have more hearing to lose). The predicted profiles for each subjects' ears can be found in Figure \@ref(fig:mixedfixedprofiles).
 
-```{r mixedfixedprofiles, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE, fig.cap="Predicted profiles from the final mixed model."}
+```{r mixedfixedprofiles, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE, fig.cap="Predicted profiles from the final mixed model.", fig.width=6, fig.height=4}
 dat_mixed5 <- data.frame(time = data$TIME,
                        pred = fitted(mixed),
                        Subject = data$id,
