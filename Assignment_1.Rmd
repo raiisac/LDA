@@ -957,7 +957,9 @@ qqline(qres)
 
 # Discussion and conclusion
 
-We observe that on average men’s hearing degrades as they get older. This happens in a slightly exponential manner, however when looking at it linearly, men increase their hearing threshold by about 0.25 decibels per year. Looking at it a bit more closely men younger than 55 increase their hearing threshold by about 0.22 decibels per year, while those above 55 do so by about 0.4 decibels per year. We do not see any difference between the left and right ear. Further we see that people with very good hearing to begin with are more sensitive to hearing loss as we see a slight negative correlation between random slopes and intercepts (-0.183).
+We observe that on average men’s hearing degrades as they get older, especially after 50 years of age. Men increase their hearing threshold  from the age of about 20 years old and the speed of hearing loss increases as the subjects get older. We do not see any difference between the left and right ear.
+As was seen in the literature, we also observed a learning effect; subjects' hearing threshold is expected to be about 1dB higher the first time they get their hearing threshold measured.
+Further we see that people with very good hearing to begin with are more sensitive to hearing loss as we see a slight negative correlation between random slopes and intercepts (-0.183).
 
 ## Further research
 We recommend that future experiments be conducted with a few but vital differences. First, we would recommend that each subject is measured at a fixed time interval. Presently the time difference between steps varies between measurements. Having measurements be done at a fixed interval would allow us to implement a wider selection of covariance structure to the models. Presently autoregressive or Toeplitz type covariance structures are not really applicable to the experimental design.
