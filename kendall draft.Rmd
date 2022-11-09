@@ -564,7 +564,7 @@ data.frame(var = unique(c(rownames(s4$coefficients),
 
 ```
 
-Table 4 details the results of the ANCOVA where the variance of the hearing capabilities. In agreement with the previously derived summary statistics, the starting age of the patient as well as their time spent within the study both have an effect on the MAD and SPY statistics. In further agreement with past results the side of the ear remains unimportant when inferring the expected periodic change of subjects’ hearing capabilities. From these results it can be stated that both age and the time spent within the study have a positive effect on the observed variance of the measured responce. As was in the case with previous analyses, these results imply a potentially large shift in hearing capabilities over time.
+Table 4 details the results of the ANCOVA where the variance of the hearing capabilities. In agreement with the previously derived summary statistics, the starting age of the patient as well as their time spent within the study both have an effect on the MAD and SPY statistics. In further agreement with past results the side of the ear remains unimportant when inferring the expected periodic change of subjects’ hearing capabilities. From these results it can be stated that both age and the time spent within the study have a positive effect on the observed variance of the measured responce. As was in the case with previous analyses, these results imply a potentially large shift in hearing capabilities over time. As was the case with previous analyses, their does not appear to be a signiifcant difference between the two ears.
 
 ```{r eval=FALSE, include=FALSE}
 # data.right=data[data$side=="right",]
