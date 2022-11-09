@@ -678,9 +678,9 @@ data.frame(Variable = rownames(Ancova.SPY),
 
 ## Multivariate model
 
-We find that the model $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk}$ is the most parsimonious model. We further find that the effect of the *side* variable does not significantly influence the hearing threshold. These conclusions hold for a much wider selection of models (we present here only sample of what we tested) or even when we filter the data under different conditions (Removing subjects with less than $n=\{2,4,5,6\}$ observations,looking at only the right/left ear, treating each ear-subject pair as single subject, balancing the data, grouping the subjects in cohorts of $\{1,5,10,15,20\}$ years and creating dummy variables for them).
+We find that the model $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk}$ performs really well and is congruent with what has been found before in the literature (model 2 in Table \@ref(tab:multivariate-mean)). We further find that the effect of the *side* variable does not significantly influence the hearing threshold. These conclusions hold for a much wider selection of models (we present here only sample of what we tested) or even when we filter the data under different conditions (Removing subjects with less than $n=\{2,4,5,6\}$ observations, looking at only the right/left ear, treating each ear-subject pair as single subject, balancing the data, grouping the subjects in cohorts of $\{1,5,10,15,20\}$ years and creating dummy variables for them).
 
-```{r warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
+```{r multivariate-mean, warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
 mf <- formula(y ~ age+TIME+side+age:TIME+age:side+TIME:side)
 gee1 <- geeglm(mf, data = data, id = id, corstr = "independence")
 sgee1 <- coef(summary(gee1)) %>% as.data.frame %>%
@@ -745,7 +745,7 @@ data.frame(
   left_join(sgee3[,c('var','gee3')]) %>%
   left_join(sgee4[,c('var','gee4')]) %>%
   left_join(sgee5[,c('var','gee5')]) %>%
-  rbind(c('QIC', round(QIC(gee1)[2],2), round(QIC(gee2)[2],2), 
+  rbind(c('QICu', round(QIC(gee1)[2],2), round(QIC(gee2)[2],2), 
           round(QIC(gee3)[2],2), round(QIC(gee4)[2],2), round(QIC(gee5)[2],2))) %>%
   rbind(c("RMSE", round(mean(sqrt(resid(gee1)^2)),2), round(mean(sqrt(resid(gee1)^2)),2),
         round(mean(sqrt(resid(gee3)^2)),2),round(mean(sqrt(resid(gee4)^2)),2),
@@ -757,12 +757,45 @@ data.frame(
   kableExtra::row_spec(10, hline_after = TRUE)
 ```
 
-Now we will take a look at alternative ways to optimize our models. The covariance structure of the model denotes the observed relation between the model variables. Certain structures may lead to a stronger model fit, whereas others are inappropriate given the nature of our data. We will compare the same model mean structure i.e. $Y_{ijk} = age_{i} + TIME_{jk}$ under different covariance structures and evaluate them according to Quasi Information Criterion (`QIC`) value. This is a performance metric which details the relative performance between a set of models. 
+Now we will take a look at different covariance structures for the model (Table \@ref(tab:multivariate-mean). Certain structures may lead to a stronger model fit, whereas others are inappropriate given the nature of our data. We will compare the same model mean structure i.e. $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk}$ under different covariance structures and evaluate them according to Quasi Information Criterion (`QIC`) value. This is a performance metric which details the relative performance between a set of models. 
+
+```{r multivariate-var, warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
+mf <- formula(y ~ age*TIME + learning + I(age^2))
+gee_opt1 <- geeglm(mf, data=data, id = id, corstr="independence")
+# QIC(gee_opt1)
+# mean(sqrt(resid(gee_opt1)^2))
+gee_opt2 <- geeglm(mf, data=data, id=id, corstr="exchangeable")
+# QIC(gee_opt2)
+# mean(sqrt(resid(gee_opt2)^2))
+#gee_opt3 <- geeglm(mf, data=df, id=id, corstr="unstructured")
+#QIC(gee_opt3)
+
+data.frame(var = c("QIC","RMSE"),
+           Independent = c(round(unname(QIC(gee_opt1)[1],3)), 
+                           round(mean(sqrt(resid(gee_opt1)^2)),2)),
+           CompoundSymm = c(round(unname(QIC(gee_opt2)[1],3)), 
+                           round(mean(sqrt(resid(gee_opt2)^2)),2))) %>%
+  kable(booktabs = TRUE,
+        caption = "Comparison of multivariate models with an independent variance structure and a compound symmetry structure.",
+        col.names = c("", "independent", "compound \nsymmetry")) 
+```
 
 It appears that a covariance structure that assumes independence across the variables produces the lowest `QIC` value, nevertheless it behooves us to take a closer look at these two models. First let's consider the model with a covariance structure that assumes equal covariances between variables with equivalent variances (compound symmetry). 
+```{r multivariate-var2, warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
+gee_opt1_new <- gee(mf, data=data, id = id, family = gaussian, corstr="exchangeable")
+summary(gee_opt1_new)$coefficients %>%
+  kable(booktabs = TRUE,
+         caption = "results for the model with compound symmetry")
+```
 
-In the above output we notice that we get two standard errors: Naive and Robust. Normally we would want to use the Robust estimates because the variances of coefficient estimates tend to be too small when responses within subjects are correlated (Bilder and Loughin, 2015), however in this case there is little difference between the Naive and Robust estimates. This further suggests that the independence assumption of the correlation structure seems realistic (Hothorn and Everitt, 2014). In the bottom we see a `Working correlation` output which shows the upper $4\times 4$ of the Variance-Covariance matrix used for this model (the size depends on the number of observations per individual with the largest beeing $29\times 29$ ). Below we will report the best model we could find under the conditions of this task. It has the same parameter estimates as a least squares model with the same mean structure specification, however the robust errors in this model are more accurate, as some of the conditions of the least squares model are not fulfilled (e.g. Normally distributed residuals)
 
+In the Table \@ref(tab:multivariate-var2) for the model with compound symmetry correlation structure, we notice that we get two standard errors: Naive and Robust. Normally we would want to use the Robust estimates because the variances of coefficient estimates tend to be too small when responses within subjects are correlated [@bilder2014analysis], however in this case there is little difference between the Naive and Robust estimates. This further suggests that the independence assumption of the correlation structure seems realistic [@hothorn2009handbook]. Table \@ref(tab:multivariate-var2indep) shows the best model we could find under the conditions of this task. It has the same parameter estimates as a least squares model with the same mean structure specification, however the robust errors in this model are more accurate, as some of the conditions of the least squares model are not fulfilled (e.g. Normally distributed residuals)
+```{r multivariate-var2indep, warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
+gee_opt1_new <- gee(mf, data=data, id = id, family = gaussian, corstr="independence")
+summary(gee_opt1_new)$coefficients %>%
+  kable(booktabs = TRUE,
+         caption = "results for the model with independence")
+```
 
 ## Two-stage analysis
 
