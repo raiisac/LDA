@@ -72,7 +72,7 @@ Normally, each ear is measured at each visit but this only happened in `r round(
 Previous research on the hearing data of males in the Baltimore Longitudinal Study of Aging (BLSA) showed a change in hearing threshold for all age groups but especially the older population [@doi:10.1121/1.399731]. In contrast to our dataset, @doi:10.1121/1.412231 and @morrell1997construction consider females in their study. They similarly found a decrease in hearing sensitivity for all ages at 500Hz and included a quadratic function of age to predict the hearing threshold, as in @verbeke2001conditional. Additionally, a statistically significant learning effect from the first visit to subsequent visits was found [@morrell1997construction; @verbeke2001conditional]. @morrell1997construction observed that hearing levels are slightly poorer on average on the left compared to the right ear and that the variance in the hearing threshold is higher for people with a higher age.
 
 
-Figures \@ref(fig:rawdata) and \@ref(fig:rawdata2) show the trends in the hearing threshold for all volunteers over time. These figures shows that many volunteers' hearing threshold over time have an erratic pattern meaning there is likely high variability **within subjects**. Additionally, variability **between subjects** is also high, especially for older volunteers.  
+Figure \@ref(fig:rawdata) shows the trends in the hearing threshold for all volunteers over time. These figures shows that many volunteers' hearing threshold over time have an erratic pattern meaning there is likely high variability **within subjects**. Additionally, variability **between subjects** is also high, especially for older volunteers.  
 
 
 ```{r demographics, echo=FALSE}
@@ -126,7 +126,7 @@ data %>%
   ylab("Hearing threshold (Db)") 
 ```
 
-```{r rawdata2, echo=FALSE, fig.cap= "Hearing threshold over time, divided by left and right ear.", fig.height=5}
+```{r rawdata2, echo=FALSE, eval = FALSE, fig.cap= "Hearing threshold over time, divided by left and right ear.", fig.height=5}
 eardistribution <- data %>%
   group_by(side) %>%
   summarize(nb = n_distinct(id)) %>%
@@ -444,7 +444,7 @@ In a two-stage analysis, subject-specific intercepts and time effects are first 
 
 ## Random-effects model
 
-Lastly, a random-effects model is fit. This model is similar to the two-stage model but both stages are now combined in one model. We use the [*glmmTMB*](https://cran.r-project.org/web/packages/glmmTMB/) / [*lme4*](https://cran.r-project.org/web/packages/lme4/) ????which one???? packages in R to fit the models.
+Lastly, a random-effects model is fit. This model is similar to the two-stage model but both stages are now combined in one model. We use the [*nlme*](https://cran.r-project.org/web/packages/nlme/) package in R to fit the models.
 
 # Results
 
@@ -777,22 +777,25 @@ data.frame(var = c("QIC","RMSE"),
                            round(mean(sqrt(resid(gee_opt2)^2)),2))) %>%
   kable(booktabs = TRUE,
         caption = "Comparison of multivariate models with an independent variance structure and a compound symmetry structure.",
-        col.names = c("", "independent", "compound \nsymmetry")) 
+        col.names = c("", "independent /\n simple", "compound \nsymmetry")) 
 ```
 
-It appears that a covariance structure that assumes independence across the variables produces the lowest `QIC` value, nevertheless it behooves us to take a closer look at these two models. First let's consider the model with a covariance structure that assumes equal covariances between variables with equivalent variances (compound symmetry). 
-```{r multivariate-var2, warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
+It appears that a simple covariance structure that assumes independence across the variables produces the lowest `QIC` value, nevertheless it behooves us to take a closer look at these two models. First let's consider the model with a covariance structure that assumes equal covariances between variables with equivalent variances (compound symmetry). 
+```{r warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE, results='hide'}
 gee_opt1_new <- gee(mf, data=data, id = id, family = gaussian, corstr="exchangeable")
+gee_opt2_new <- gee(mf, data=data, id = id, family = gaussian, corstr="independence")
+
+```
+```{r multivariate-var2, warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
 summary(gee_opt1_new)$coefficients %>%
   kable(booktabs = TRUE,
          caption = "results for the model with compound symmetry")
 ```
 
 
-In the Table \@ref(tab:multivariate-var2) for the model with compound symmetry correlation structure, we notice that we get two standard errors: Naive and Robust. Normally we would want to use the Robust estimates because the variances of coefficient estimates tend to be too small when responses within subjects are correlated [@bilder2014analysis], however in this case there is little difference between the Naive and Robust estimates. This further suggests that the independence assumption of the correlation structure seems realistic [@hothorn2009handbook]. Table \@ref(tab:multivariate-var2indep) shows the best model we could find under the conditions of this task. It has the same parameter estimates as a least squares model with the same mean structure specification, however the robust errors in this model are more accurate, as some of the conditions of the least squares model are not fulfilled (e.g. Normally distributed residuals)
+In the Table \@ref(tab:multivariate-var2), the model with compound symmetry correlation structure, we notice that we get two standard errors: Naive and Robust. Normally we would want to use the Robust estimates because the variances of coefficient estimates tend to be too small when responses within subjects are correlated [@bilder2014analysis], however in this case there is little difference between the Naive and Robust estimates. This further suggests that the independence assumption of the correlation structure seems realistic [@hothorn2009handbook]. Table \@ref(tab:multivariate-var2indep) shows the best model we could find under the conditions of this task. It has the same parameter estimates as a least squares model with the same mean structure specification, however the robust errors in this model are more accurate, as some of the conditions of the least squares model are not fulfilled (e.g. Normally distributed residuals)
 ```{r multivariate-var2indep, warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE}
-gee_opt1_new <- gee(mf, data=data, id = id, family = gaussian, corstr="independence")
-summary(gee_opt1_new)$coefficients %>%
+summary(gee_opt2_new)$coefficients %>%
   kable(booktabs = TRUE,
          caption = "results for the model with independence")
 ```
@@ -904,19 +907,34 @@ data.frame(
 Table \@ref(tab:twostage) shows the results for the second stage. The first row shows estimates for $\beta_0$, $\beta_1$ and $\beta_2$. The estimated hearing threshold on the first visit for a person that is 0 years old is `r round(stage2[[1]]$coefficients["(Intercept)","Estimate"],3)` `r round(stage2[[3]]$coefficients["(Intercept)","Estimate"],3)` =  `r round(stage2[[1]]$coefficients["(Intercept)","Estimate"] + stage2[[3]]$coefficients["(Intercept)","Estimate"],3)`dB and increases exponentially for each life year age$^2$ is highly significant. The expected slope increases with age (`r paste(round(stage2[[2]]$coefficients["age","Estimate"],3), " (p-value of",  round(stage2[[2]]$coefficients["age","Pr(>|t|)"],3), ")")`).
 
 ## Random-effects model
-```{r mixed, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
-mixed <- nlme::lme(y ~ age*TIME + learning + I(age^2), data= data, 
-                   random = ~1+TIME|id/side)
+
+Using what we have learned from the previous sections, and after test several models for the mean structure, we end up with the model $Y_{ijk} = age_{ij} + age^2_{ij} + learning_{ijk} + TIME_{ijk}$ with a random slope and random intercept with $id$ and $side$ as grouping variables (although there was no overall population effect of $side$, it appears that some peoples' left ear consistently scores better/worse than their right ear).
+
+```{r mixedfixed, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
+mixed <- nlme::lme(y ~ age*TIME + learning + I(age^2), data = data, 
+                   random = ~1+TIME|id/side)#simple (no correlations)
 s <- summary(mixed)
+mixedcomp <- nlme::lme(y ~ age*TIME + learning + I(age^2), data = data, 
+                   random = ~1+TIME|id/side,
+                   cor = nlme::corCompSymm())
+mixed
+
 ```
 
+After having selected the mean structure of the model we need to select the appropriate covariance structure. We do so using a number of measures first with the help of our theoretical understanding, then using the AIC/QIC. Theoretical understanding helps us narrow the number of structures we need to test, for example Autoregressive or Toeplitz type structures are automatically excluded due to irregularities in the time intervals between measurements. For models (mixed model) which use the maximum likelihood we use the AIC. Although the AIC is normally used to select the optimal model using the likelihood and penalizing the number of parameters, we use it to select the covariance structure. That is while holding the parameters the same but changing the covariance structure we see a decrease in the AIC only as a result of a higher likelihood. The same is done with the QIC but for models which use the Quasi maximum Likelihood. We observe that in the mixed model a simple covariance structure has better performance (AIC = `r AIC(mixed)`) than using compound symmetry (AIC = `r AIC(mixedcomp)`).
 
 # Discussion and conclusion
 
-## Further research
-The fact that the data set is unbalanced, complicates the analysis significantly. Inviting the subjects to the clinic for a hearing test at fixed time instances and consistently measuring both ears in each visit can alleviate these problems. 
+We observe that on average men’s hearing degrades as they get older. This happens in a slightly exponential manner, however when looking at it linearly, men increase their hearing threshold by about 0.25 decibels per year. Looking at it a bit more closely men younger than 55 increase their hearing threshold by about 0.22 decibels per year, while those above 55 do so by about 0.4 decibels per year. We do not see any difference between the left and right ear. Further we see that people with very good hearing to begin with are more sensitive to hearing loss as we see a slight negative correlation between random slopes and intercepts (-0.183).
 
-For future research, a different covariance structure for older/younger people.
+## Further research
+We recommend that future experiments be conducted with a few but vital differences. First, we would recommend that each subject is measured at a fixed time interval. Presently the time difference between steps varies between measurements. Having measurements be done at a fixed interval would allow us to implement a wider selection of covariance structure to the models. Presently autoregressive or Toeplitz type covariance structures are not really applicable to the experimental design.
+
+Secondly, we would recommend that there is a minimum number of measurements implemented per subject. As it stands there are subjects which were measured only once which greatly reduces the available methodology. We would recommend a minimum number of 4 (2 times for each ear) measurements per subject, with more measurements naturally being preferable.
+
+
+Low number of observations could be to some extent be mitigated in an OLS type setting with the addition of a LASOO or RIDGE penalty. This naturally leads to an estimator which although not consistent, has a much smaller variance, which ultimately leads to a better performance. We are unsure if a LASOO or RIDGE regression is compatible with a mixed model type set up, where we calculate a separate LASOO/RIDGE penalty per subject. We hypothesize this type of methodology could also lead to a per subject variable selection in the LASOO case, which could be useful in problems with many independent variables with non-homogenous subjects. Further research is needed.
+
 
 # Bibliography
 
