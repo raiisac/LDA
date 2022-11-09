@@ -573,7 +573,7 @@ data.frame(var = unique(c(rownames(s4$coefficients),
 
 ```
 
-Table \@ref(tab:madspy) details the results of the ANCOVA where the variance of the hearing capabilities are modeled respective to patient age and time within the study. In agreement with the previously derived summary statistics, the starting age of the patient as well as their time spent within the study both have an effect on the MAD and SPY statistics. In further agreement with past results the side of the ear remains unimportant when inferring the expected periodic change of subjects’ hearing capabilities. From these results it can be stated that both age and the time spent within the study have a positive effect on the observed variance of the measured response. As was in the case with previous analyses, these results imply a potentially large shift in hearing capabilities over time. As was the case with previous analyses, their does not appear to be a significant difference between the two ears.
+Table \@ref(tab:madspy) details the results of the ANCOVA where the variance of the hearing capabilities are modeled respective to patient age and time within the study. In agreement with the previously derived summary statistics, the starting age of the patient as well as their time spent within the study both have an effect on the MAD and SPY statistics. In further agreement with past results the side of the ear remains unimportant when inferring the expected periodic change of subjects’ hearing capabilities. From these results it can be stated that both age and the time spent within the study have a positive effect on the observed variance of the measured response. As was in the case with previous analyses, these results imply a potentially large shift in hearing capabilities over time. 
 
 ```{r madspy, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
 library(tseries)
@@ -780,7 +780,7 @@ data.frame(var = c("QIC","RMSE"),
         col.names = c("", "independent /\n simple", "compound \nsymmetry")) 
 ```
 
-It appears that a simple covariance structure that assumes independence across the variables produces the lowest `QIC` value, nevertheless it behooves us to take a closer look at these two models. First let's consider the model with a covariance structure that assumes equal covariances between variables with equivalent variances (compound symmetry). 
+It appears that a simple covariance structure that assumes independence across the variables produces the lowest `QIC` value, nevertheless it behooves us to take a closer look at these two models. First let's consider the model with a covariance structure that assumes independence within subject observations (compound symmetry). 
 ```{r warning=FALSE, echo=FALSE, warning = FALSE, message = FALSE, results='hide'}
 gee_opt1_new <- gee(mf, data=data, id = id, family = gaussian, corstr="exchangeable")
 gee_opt2_new <- gee(mf, data=data, id = id, family = gaussian, corstr="independence")
