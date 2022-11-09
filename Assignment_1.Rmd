@@ -6,6 +6,7 @@ output:
   bookdown::pdf_document2: 
     toc: false
     latex_engine: xelatex
+    fig_caption: yes
     includes:
       in_header: preamble.sty
       before_body: titlepage.sty
@@ -35,7 +36,8 @@ data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
          age_measurement = age + TIME,
          age_discrete = cut(age,
                             breaks = c(0,30,50,70,100),
-                            labels = c("<30", "30-50", "50-70",">70")))
+                            labels = c("<30", "30-50", "50-70",">70")),
+         learning = 1*(TIME == 0))
 #data %>%group_by(id) %>%summarize(diff = max(age_start) - min(age_start)) age_start should be the same all the time but there are huge differences. How is this possible?
 summary_data_id <- data %>%
   group_by(id) %>%
@@ -360,8 +362,13 @@ save(vgm, file = find_root_file("data", "vgm.RData",
   load(find_root_file("data/vgm.RData", 
      criterion = has_file("LDA.Rproj")))
 }
-plot(vgm, ylim = c(0,200))
-#box(); axis(1); axis(2); title(xlab = "TIME")
+if (!file.exists(find_root_file("data/variogram.pdf", 
+     criterion = has_file("LDA.Rproj")))){
+  pdf(width = 6, height = 4, file = "data/variogram.pdf")
+  plot(vgm, ylim = c(0,200))
+  dev.off()
+}
+knitr::include_graphics("data/variogram.pdf")
 ```
 Lastly, a semi-variogram is constructed using the [*joineR* package](https://rdrr.io/cran/joineR/) (Figure \@ref(fig:variogram)). The total variance is estimated to be `r round(vgm$sigma2,2)`. Measurement error is approximately `r round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)`, the serial correlation component is approximately `r round(mean(vgm$svar[vgm$svar[,1]==21,2]),2) - round(mean(vgm$svar[vgm$svar[,1]==0,2]),2)` and the between-subject variability is thus `r round(vgm$sigma2 - mean(vgm$svar[vgm$svar[,1]==21,2]),2)`.
 
@@ -672,21 +679,20 @@ data.frame(Variable = rownames(Ancova.SPY),
 
 ## Two-stage analysis
 
-As previous analyses showed that individuals may have a different time effect, the two-stage analysis first fit individual-specific intercept, time effect (slope), and *firsttime* learning effect. As all previous analyses did not uncover a significant effect of the side of the ear, it is no longer considered in this analysis.
+As previous analyses showed that individuals may have a different time effect, the two-stage analysis first fits individual-specific intercept and time effect (slope). As all previous analyses did not uncover a significant effect of the side of the ear, it is no longer considered in this analysis.
 
-The first stage analysis fits the model in equation \@ref(eq:firststage). Next, the first stage results are used in the second stage (equation \@ref(eq:secondstage)) to relate the estimated subject-specific parameters to age.
+The first stage analysis fits the linear model in equation \@ref(eq:firststage); the variable *learning* is 1 if it's the first visit for the subject ($TIME == 0$). Next, the first stage results are used in the second stage (equation \@ref(eq:secondstage)) to relate the estimated subject-specific parameters to age.
 
 \begin{equation}
-Y_{ij} = \beta_{1i} + \beta_{2i}TIME_{ij} + \beta_{3i}\text{firsttime}_{ij} +\varepsilon_{ij} \quad j = 1,....,n_i
+Y_{ij} = \beta_{1i} + \beta_{2i}TIME_{ij} + \beta_{2i}*learning_{ij} + \varepsilon_{ij} \quad j = 1,....,n_i
 (\#eq:firststage)
 \end{equation}
 
 \begin{equation}
 \left\{
                 \begin{array}{ll}
-                  \beta_{1i} = \beta_{0} + \beta_{1}age_i + b_{1i}\\
-                  \beta_{2i} = \beta_{2} + \beta_{3}age_i + b_{2i}\\
-                  \beta_{3i} = \beta_{4} + \beta_{5}age_i + b_{3i}
+                  \beta_{1i} = \beta_{0} + \beta_{1}age_i + \beta_{2}age^2_i + b_{1i}\\
+                  \beta_{2i} = \beta_{3} + \beta_{4}age_i + \beta_{5}age^2_i + b_{2i}
                 \end{array}
               \right.
 (\#eq:secondstage)
@@ -705,7 +711,7 @@ stage1 <- data %>%
          firsttime = 1*(TIME == 0)) %>%
   group_by(id) %>%
   filter(n_distinct(TIME) > 1) %>%#only keep id with measures on at least 2 time instances
-  do(model = lm(y ~ 1 + TIME + firsttime, data = .)) %>%
+  do(model = lm(y ~ 1 + TIME + learning, data = .)) %>%
   ungroup() %>%
   mutate(intercept = unlist(model$model)$`coefficients.(Intercept)`)
 stage1.results <- stage1 %>% dplyr::select(id) %>%
@@ -724,11 +730,11 @@ stage1.results <- stage1 %>% dplyr::select(id) %>%
     #   FUN = function(x){
     #     unlist(
     #       stage1[x,"model"]$model)$`coefficients.TIME2`}),
-    firsttime = sapply(
+    learning = sapply(
       X = 1:nrow(stage1),
       FUN = function(x){
         unlist(
-          stage1[x,"model"]$model)$`coefficients.firsttime`})
+          stage1[x,"model"]$model)$`coefficients.learning`})
     ) %>%
   left_join(data[,c('id', 'age')] %>%
               group_by(id, age) %>%
@@ -736,12 +742,12 @@ stage1.results <- stage1 %>% dplyr::select(id) %>%
 
 #stage2
 stage2 <- lapply(
-  X = c("intercept", "TIME", "firsttime"),
+  X = c("intercept", "TIME", "learning"),
   FUN = function(x){
-    summary(lm(as.formula(paste(x,"~age")), data = stage1.results))}
+    summary(lm(as.formula(paste(x,"~age + I(age^2)")), data = stage1.results))}
 )
 data.frame(
-  model = c('Intercept', "TIME", "firsttime"),
+  model = c('Intercept', "TIME", "learning"),
   intercept = 
     sapply(X = 1:length(stage2), FUN =
              function(x){
@@ -759,13 +765,23 @@ data.frame(
                  " ", 
                  stars.pval(stage2[[x]]$coefficients["age","Pr(>|t|)"])
                )
+               }),
+  age2 = 
+    sapply(X = 1:length(stage2), FUN =
+             function(x){
+               paste(
+                 round(stage2[[x]]$coefficients["I(age^2)","Estimate"],3),
+                 " ", 
+                 stars.pval(stage2[[x]]$coefficients["I(age^2)","Pr(>|t|)"])
+               )
                })
 ) %>%
   kable(booktabs = TRUE,
-        caption = "Second-stage results")
+        caption = "Second-stage results",
+        col.names = c('model', 'intercept', 'age', 'age^2'))
 ```
 
-Table \@ref(tab:twostage) shows the results for the second stage. The first row shows estimates for $\beta_0$ and $\beta_1$. The estimated intercept for a person that is 0 years old is `r round(stage2[[1]]$coefficients["(Intercept)","Estimate"],3)`dB and increases by `r round(stage2[[1]]$coefficients["age","Estimate"],3)`dB for each life year. The expected slope also significantly increases with age (`r paste(round(stage2[[2]]$coefficients["age","Estimate"],3), " ",  stars.pval(stage2[[2]]$coefficients["age","Pr(>|t|)"]))`).
+Table \@ref(tab:twostage) shows the results for the second stage. The first row shows estimates for $\beta_0$, $\beta_1$ and $\beta_2$. The estimated hearing threshold on the first visit for a person that is 0 years old is `r round(stage2[[1]]$coefficients["(Intercept)","Estimate"],3)` `r round(stage2[[3]]$coefficients["(Intercept)","Estimate"],3)` =  `r round(stage2[[1]]$coefficients["(Intercept)","Estimate"] + stage2[[3]]$coefficients["(Intercept)","Estimate"],3)`dB and increases exponentially for each life year age$^2$ is highly significant. The expected slope increases with age (`r paste(round(stage2[[2]]$coefficients["age","Estimate"],3), " (p-value of",  round(stage2[[2]]$coefficients["age","Pr(>|t|)"],3), ")")`).
 
 ## Random-effects model
 
