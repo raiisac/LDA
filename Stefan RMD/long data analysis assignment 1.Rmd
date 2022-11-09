@@ -73,6 +73,16 @@ gee5 <- geeglm(mf5, data=df, id=id, corstr="independence")
 QIC(gee5)[2]
 mean(sqrt(resid(gee5)^2))
 coef(summary(gee5))
+mf6 <- formula(y ~ age + TIME + I(age^2))
+gee6 <- geeglm(mf6, data=df, id=id, corstr="independence")
+QIC(gee6)[2]
+mean(sqrt(resid(gee6)^2))
+coef(summary(gee6))
+mf7 <- formula(y ~ age + TIME + I(age^2) + learning)
+gee7 <- geeglm(mf7, data=df, id=id, corstr="independence")
+QIC(gee7)[2]
+mean(sqrt(resid(gee7)^2))
+coef(summary(gee7))
 #mf6 <- formula(y ~ TIME)
 #gee6 <- geeglm(mf6, data=df, id=id, corstr="independence")
 #QIC(gee6)[2]
