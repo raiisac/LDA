@@ -424,14 +424,14 @@ A first, obvious problem with this method is that it does not allow us to test a
 To examine if the periodic shift in hearing capacity is affected by the patient's initial age and their time within the study, we examine their individual observed median absolute deviations (MAD) and their incremental shifts in hearing capability per year (SPY).
 
 \begin{equation}
-MAD = MEDIAN(|Y_{ijk}-\overline{Y_{ij}}|)
+MAD_{ij} = MEDIAN(|Y_{ijk}-\overline{Y_{ij}}|)
 \end{equation}
 
 \begin{equation}
-SPY = \frac{Y_{ijk_{max}}-Y_{ij1}}{Trial Duration}
+SPY_{ij} = \frac{Y_{ijk_{max}}-Y_{ij1}}{Trial Duration}
 \end{equation}
 
-The goal here is to see if patients of an older age or patients with a longer study period have larger degrees of variability in their hearing capacity. Examination of this relation could pose to provide insight into the nature of how hearing capability evolves over time. A positive relation between these metrics and a patients' starting age, in addition to their time spent in the study, would imply that hearing capabilities of older people have a more pronounced evolution compared to those of younger people. These variability measurements were taken in respect to both the left and right ears and then analyzed via an ANCOVA model. 
+The goal here is to see if patients of an older age, or patients with a longer study period, have larger degrees of variability in their hearing capacity. Examination of this relation could pose to provide insight into the nature of how hearing capability evolves over time. A positive relation between these metrics and a patients' starting age, in addition to their time spent in the study, would imply that hearing capabilities of older people have a more pronounced evolution compared to those of younger people. These variability measurements were taken in respect to both the left and right ears and then analyzed via an ANCOVA model. 
 
 ## Multivariate model
 
@@ -573,7 +573,7 @@ data.frame(var = unique(c(rownames(s4$coefficients),
 
 ```
 
-Table \@ref(tab:madspy) details the results of the ANCOVA where the variance of the hearing capabilities. In agreement with the previously derived summary statistics, the starting age of the patient as well as their time spent within the study both have an effect on the MAD and SPY statistics. In further agreement with past results the side of the ear remains unimportant when inferring the expected periodic change of subjects’ hearing capabilities. From these results it can be stated that both age and the time spent within the study have a positive effect on the observed variance of the measured response. As was in the case with previous analyses, these results imply a potentially large shift in hearing capabilities over time. As was the case with previous analyses, their does not appear to be a significant difference between the two ears.
+Table \@ref(tab:madspy) details the results of the ANCOVA where the variance of the hearing capabilities are modeled respective to patient age and time within the study. In agreement with the previously derived summary statistics, the starting age of the patient as well as their time spent within the study both have an effect on the MAD and SPY statistics. In further agreement with past results the side of the ear remains unimportant when inferring the expected periodic change of subjects’ hearing capabilities. From these results it can be stated that both age and the time spent within the study have a positive effect on the observed variance of the measured response. As was in the case with previous analyses, these results imply a potentially large shift in hearing capabilities over time. As was the case with previous analyses, their does not appear to be a significant difference between the two ears.
 
 ```{r madspy, echo=FALSE, include=TRUE,  warning=FALSE, message=FALSE}
 library(tseries)
@@ -933,7 +933,7 @@ We recommend that future experiments be conducted with a few but vital differenc
 Secondly, we would recommend that there is a minimum number of measurements implemented per subject. As it stands there are subjects which were measured only once which greatly reduces the available methodology. We would recommend a minimum number of 4 (2 times for each ear) measurements per subject, with more measurements naturally being preferable.
 
 
-Low number of observations could be to some extent be mitigated in an OLS type setting with the addition of a LASOO or RIDGE penalty. This naturally leads to an estimator which although not consistent, has a much smaller variance, which ultimately leads to a better performance. We are unsure if a LASOO or RIDGE regression is compatible with a mixed model type set up, where we calculate a separate LASOO/RIDGE penalty per subject. We hypothesize this type of methodology could also lead to a per subject variable selection in the LASOO case, which could be useful in problems with many independent variables with non-homogenous subjects. Further research is needed.
+Low number of observations could be to some extent be mitigated in an OLS type setting with the addition of a LASSO or RIDGE penalty. This naturally leads to an estimator which although not consistent, has a much smaller variance, which ultimately leads to a better performance. We are unsure if a LASSO or RIDGE regression is compatible with a mixed model type set up, where we calculate a separate LASOO/RIDGE penalty per subject. We hypothesize this type of methodology could also lead to a per subject variable selection in the LASSO case, which could be useful in problems with many independent variables with non-homogenous subjects. Further research is needed.
 
 
 # Bibliography
