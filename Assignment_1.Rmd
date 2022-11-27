@@ -27,7 +27,6 @@ library(gee)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
-# Abstract {-}
 
 # Introduction and data exploration
 ```{r load, include=FALSE, message=FALSE, warning=FALSE}

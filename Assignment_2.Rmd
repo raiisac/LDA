@@ -27,13 +27,16 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load, include=FALSE, message=FALSE, warning=FALSE}
-trichotomization <- c(0, 50, 70, 120)
+trichotomization <- c(0, 20, 30, 100)
 data <- read_sas(find_root_file("data/hearing500lr.sas7bdat", 
      criterion = has_file("LDA.Rproj"))) %>%
   mutate(side = as.factor(side),
          id = as.factor(id),
          age_measurement = age + TIME,
          age_discrete = cut(age,
+                            breaks = c(0,30,50,70,100),
+                            labels = c("<30", "30-50", "50-70",">70")),
+         y_discrete = cut(y,
                             breaks = trichotomization,
                             labels = c("Normal", "Reduced", "Bad")),
          learning = 1*(TIME == 0))
