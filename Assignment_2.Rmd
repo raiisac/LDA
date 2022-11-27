@@ -1,0 +1,59 @@
+---
+documentclass: article
+fontsize: 12pt
+date: "`r Sys.Date()`"
+output: 
+  bookdown::pdf_document2: 
+    toc: false
+    latex_engine: xelatex
+    fig_caption: yes
+    includes:
+      in_header: preamble.sty
+      before_body: titlepage.sty
+bibliography: references.bib  
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(haven) # to read SAS files
+library(kableExtra)
+library(qwraps2)
+library(rprojroot)
+library(patchwork)
+library(psych)
+library(gtools)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load, include=FALSE, message=FALSE, warning=FALSE}
+trichotomization <- c(0, 50, 70, 120)
+data <- read_sas(find_root_file("data/hearing500lr.sas7bdat", 
+     criterion = has_file("LDA.Rproj"))) %>%
+  mutate(side = as.factor(side),
+         id = as.factor(id),
+         age_measurement = age + TIME,
+         age_discrete = cut(age,
+                            breaks = trichotomization,
+                            labels = c("Normal", "Reduced", "Bad")),
+         learning = 1*(TIME == 0))
+```
+# Data trichotomization
+
+# Marginal model
+Q2
+
+# Random-effects model
+Q2
+
+## Empirical Bayes prediction
+Q3
+
+# Transition model
+Q4
+
+# Discussion
+
+
+# Bibliography
+
