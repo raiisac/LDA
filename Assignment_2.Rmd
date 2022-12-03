@@ -40,19 +40,47 @@ data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
                             breaks = trichotomization,
                             labels = c("Normal", "Reduced", "Bad")),
          learning = 1*(TIME == 0))
+mediansplit <- cut_number(data$y, n = 3)
 ```
 # Data trichotomization
 
-First, the data is trichotomized. The Centers for Disease Control and Prevention distinguished the following levels of hearing loss [@cdchearing], based on @clark1981:
+To trichotomize the data, suitable cut-oof points need to be found. The cutoff points are often chosen based on either  expert knowledge or so as to optimize predictive power. An easy, often used method for dichotomization is a median-split since it assures that there are an equal amount of observation at either side of the cutoff value. Similarly, for trichotomization, we could aim for approximately 33.33% of the observations in each of the three categories. That would result in the following three categories: `r cat(levels(mediansplit), sep = ', ')`.
 
-- -10 - 25 dB: Normal hearing
+Alternatively, The Centers for Disease Control and Prevention distinguishes the following levels of hearing loss [@cdchearing], based on @clark1981:
+
+- \leq 25 dB: Normal hearing
 - 26 - 40 dB: Mild hearing loss
 - 41 - 55 dB: Moderate hearing loss
 - 56 - 70 dB: Moderate / severe hearing loss
-- 71 - 90 dB: Severe loss
-- \geq 91 dB: Profound loss
+- 71 - 90 dB: Severe hearing loss
+- \geq 91 dB: Profound hearingloss
 
-It is quite common to dichotomize hearing loss into normal hearing ($\leq$25 dB) and hearing loss (>25 dB) [@garinis2017cumulative; @gallagher2019; @ju2022long] but thichotomization is less common. 
+
+```{r clark, echo=FALSE, message = FALSE, fig.cap= "Hearing threshold over time, divided by left and right ear. The numbers in the bottom show the number of measurements that were taken.", fig.width = 5, fig.height=4}
+data_clark <- data %>% mutate(
+  y_clark = as.factor(cut(y, breaks = c(-13, 25, 40, 55, 56, 70, 90, 120)))
+) %>%
+  group_by(y_clark) %>%
+  summarize(n = n(),
+            n_id = n_distinct(id),
+            avg_age = mean(age_measurement),
+            nperc = n/nrow(data)*100) %>%
+  ungroup() %>% 
+  mutate(Cum = cumsum(n)/sum(n)*100) %>%
+  dplyr::select(y_clark, n, nperc, Cum, n_id, avg_age) 
+data_clark %>%
+  kable(col.names = c("Category", "Nb observations", "Percentage", 
+                      "Cumulative percentage", "Nb subjects", "Avg age"),
+        caption = "Number of observations in each pre-defined categories from Clark (1981)",
+        booktabs = TRUE,
+        digits = 2)
+```
+
+Table \@ref(tab:clark) shows that, in this dataset, there is no one in the severe hearing loss categories and the large majority has normal hearing (`r data_clark[1, "nperc"]`). 
+
+It is quite common in literature to dichotomize hearing loss into normal hearing ($\leq$25 dB) and hearing loss (>25 dB) [see @garinis2017cumulative; @gallagher2019; @ju2022long, for example]. However, thichotomization is less common and it should be noted that it is generally not advised to discretize continuous data since some information is inevitably lost [@doi:10.1080/03610926.2016.1248783; @maccallum2002practice]. 
+
+
 
 # Marginal model
 Q2
