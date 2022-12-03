@@ -43,6 +43,17 @@ data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
 ```
 # Data trichotomization
 
+First, the data is trichotomized. The Centers for Disease Control and Prevention distinguished the following levels of hearing loss [@cdchearing], based on @clark1981:
+
+- -10 - 25 dB: Normal hearing
+- 26 - 40 dB: Mild hearing loss
+- 41 - 55 dB: Moderate hearing loss
+- 56 - 70 dB: Moderate / severe hearing loss
+- 71 - 90 dB: Severe loss
+- \geq 91 dB: Profound loss
+
+It is quite common to dichotomize hearing loss into normal hearing ($\leq$25 dB) and hearing loss (>25 dB) [@garinis2017cumulative; @gallagher2019; @ju2022long] but thichotomization is less common. 
+
 # Marginal model
 Q2
 
