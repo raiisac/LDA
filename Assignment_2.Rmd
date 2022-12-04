@@ -38,10 +38,11 @@ data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
                             labels = c("<30", "30-50", "50-70",">70")),
          y_discrete = cut(y,
                             breaks = trichotomization,
-                            labels = c("Normal", "Reduced", "Bad")),
+                            labels = c("Excellent", "Normal", "Hearing loss")),
          learning = 1*(TIME == 0))
 mediansplit <- cut_number(data$y, n = 3)
 ```
+
 # Data trichotomization
 
 To trichotomize the data, suitable cut-off points need to be found. The cutoff points are often chosen based on either  expert knowledge or so as to optimize predictive power. An easy, often used method for dichotomization is a median-split since it assures that there are an equal amount of observation at either side of the cut-off value. Similarly, for trichotomization, we could aim for approximately 33.33% of the observations in each of the three categories. That would result in the following three categories: `r sprintf("%s, %s, %s",levels(mediansplit)[1],levels(mediansplit)[2],levels(mediansplit)[3])`.
@@ -55,7 +56,7 @@ It is quite common in literature to dichotomize hearing loss into normal hearing
 - 41 - 55 dB: Moderate hearing loss
 - 56 - 70 dB: Moderate / severe hearing loss
 - 71 - 90 dB: Severe hearing loss
-- \geq 91 dB: Profound hearingloss
+- \geq 91 dB: Profound hearing loss
 
 
 ```{r clark, echo=FALSE, message = FALSE, fig.cap= "Hearing threshold over time, divided by left and right ear. The numbers in the bottom show the number of measurements that were taken.", fig.width = 5, fig.height=4}
@@ -73,18 +74,35 @@ data_clark <- data %>% mutate(
 data_clark %>%
   kable(col.names = c("Category", "Nb observations", "Percentage", 
                       "Cumulative percentage", "Nb subjects", "Avg age"),
-        caption = "Number of observations in each pre-defined categories from Clark (1981)",
+        caption = "Number of observations in each pre-defined categories from Clark (1981).",
         booktabs = TRUE,
         digits = 2) %>%
   kable_styling(latex_options = "HOLD_position")
 ```
 
-Table \@ref(tab:clark) shows that, in this dataset, there is no one in the severe hearing loss categories and the large majority has normal hearing (`r data_clark[1, "nperc"]`). The median for all observation with normal hearing (\leq 25dB) is 6dB. We therefor suggest to trichotomize the data into the following categories:
+Table \@ref(tab:clark) shows that, in this dataset, there is no one in the severe hearing loss categories and the large majority has normal hearing (`r round(data_clark[1, "nperc"],2)`%). The median for all observation with normal hearing (\leq 25dB) is 6 dB. We therefor suggest to trichotomize the data into the following categories:
 
 - \leq 6 dB: Excellent hearing
 - 7 - 25 dB: Normal hearing
 - \geq 25 dB: Hearing loss
 
+```{r ydiscrete, echo=FALSE, message = FALSE, fig.cap= "Hearing threshold over time, divided by left and right ear. The numbers in the bottom show the number of measurements that were taken.", fig.width = 5, fig.height=4}
+data %>% 
+  group_by(y_discrete) %>%
+  summarize(n = n(),
+            n_id = n_distinct(id),
+            avg_age = mean(age_measurement),
+            nperc = n/nrow(data)*100) %>%
+  ungroup() %>% 
+  mutate(Cum = cumsum(n)/sum(n)*100) %>%
+  dplyr::select(y_discrete, n, nperc, Cum, n_id, avg_age) %>%
+  kable(col.names = c("Category", "Nb observations", "Percentage", 
+                      "Cumulative percentage", "Nb subjects", "Avg age"),
+        caption = "Number of observations in each category.",
+        booktabs = TRUE,
+        digits = 2) %>%
+  kable_styling(latex_options = "HOLD_position")
+```
 
 
 
