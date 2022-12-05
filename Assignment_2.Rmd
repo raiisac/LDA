@@ -47,7 +47,7 @@ mediansplit <- cut_number(data$y, n = 3)
 
 To trichotomize the data, suitable cut-off points need to be found. The cutoff points are often chosen based on either  expert knowledge or so as to optimize predictive power. An easy, often used method for dichotomization is a median-split since it assures that there are an equal amount of observation at either side of the cut-off value. Similarly, for trichotomization, we could aim for approximately 33.33% of the observations in each of the three categories. That would result in the following three categories: `r sprintf("%s, %s, %s",levels(mediansplit)[1],levels(mediansplit)[2],levels(mediansplit)[3])`.
 
-It is quite common in literature to dichotomize hearing loss into normal hearing ($\leq$25 dB) and hearing loss (>25 dB) [see @garinis2017cumulative; @gallagher2019; @ju2022long, for example]. However, thichotomization is less common and it should be noted that it is generally not advised to discretize continuous data since some information is inevitably lost [@doi:10.1080/03610926.2016.1248783; @maccallum2002practice]. 
+It is quite common in literature to dichotomize hearing loss into normal hearing (\leq25 dB) and hearing loss (>25 dB) [see @garinis2017cumulative; @gallagher2019; @ju2022long, for example]. However, thichotomization is less common and it should be noted that it is generally not advised to discretize continuous data since some information is inevitably lost [@doi:10.1080/03610926.2016.1248783; @maccallum2002practice]. 
 
 [The Centers for Disease Control and Prevention](https://www.cdc.gov/niosh/mining/userfiles/works/pdfs/2008-102.pdf) distinguishes the following levels of hearing loss, based on @clark1981:
 
