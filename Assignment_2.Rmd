@@ -104,18 +104,36 @@ data %>%
   kable_styling(latex_options = "HOLD_position")
 ```
 
+# Methodology
+All analysis was done in R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA). 
 
 
-# Marginal model
+# Results
+## Marginal model
+First, we fit a marginal model with the *ordLORgee* from the **multgee**. This function allows for an ordinal dependent variable which is appropriate for our data.
+
+```{r loadgee, echo=FALSE, message = FALSE, eval = file.exists("Stefan RMD/fit.Rdata")}
+#if the R object exists, load it to avoid long calculation times. If not, fit the model on the fly and same the object
+library(multgee)
+load("Stefan RMD/fit.Rdata")
+```
+
+```{r loadgee, echo=FALSE, message = FALSE, eval = !file.exists("Stefan RMD/fit.Rdata")}
+#if the R object exists, load it to avoid long calculation times. If not, fit the model on the fly and same the object
+library(multgee)
+fit <- ordLORgee(formula = y_discrete ~ age*TIME + I(age^2) +learning,
+                 link = "logit", id = id, data = data,
+                 LORstr = "time.exch")#category.exch"
+```
+
+
+## Random-effects model
 Q2
 
-# Random-effects model
-Q2
-
-## Empirical Bayes prediction
+### Empirical Bayes prediction
 Q3
 
-# Transition model
+## Transition model
 Q4
 
 # Discussion
