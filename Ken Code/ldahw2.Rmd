@@ -110,9 +110,9 @@ sumre
 ```{r}
 set.seed(100)
 
-nids=100
+nids=10
 simre=rep(rnorm(nids,mean=0,sd=sumre$ST[[1]][1]),samples/nids)
-simage=runif(samples,-2.5,2.5)
+simage=rep(runif(nids,-2.5,2.5),samples/nids)
 simage2=simage^2
 simTIME=runif(samples,0,20)
 simlearn=sample(c(0,1),samples,replace=T)
@@ -132,23 +132,28 @@ simdf=as.data.frame(simmat)
 colnames(simdf)=c("re","age","age2","TIME","learn","age:time","preds")
 
 
-simdf_sort=simdf%>%arrange(re,age,TIME)
+
+simdf_sort=simdf%>%arrange(re,age)
+
+simdf_sort$age_rescale=simdf_sort$age*attr(sumre$model[,2],"scaled:scale")+attr(sumre$model[,2],"scaled:center")
+simdf_sort$age2_rescale=simdf_sort$age^2
 
 fakeids=sort(rep(1:nids,samples/nids))
 
-simdf_sort=simdf_sort%>%mutate(ids=as.factor(fakeids))
+simdf_sort=simdf_sort%>%
+  mutate(ids=as.factor(fakeids),
+         age_discrete = case_when(age_rescale<30~"<30",
+                                  age_rescale<50~"30-50",
+                                  age_rescale<70~"50-70",
+                                  age_rescale>70~">70")
+         )
 
-simdf_sort%>%
-  ggplot(aes(x=age,y=preds))+
-  geom_smooth(aes(group=ids),se=F)+
-  geom_smooth(aes(color="black"),size=3)+
-  theme(legend.position="none")
+
 
 simdf_sort%>%
   ggplot(aes(x=TIME,y=preds))+
-  geom_smooth(aes(group=ids),se=F)+
-  geom_smooth(aes(color="black"),size=3)+
-  theme(legend.position="none")
+  geom_smooth(aes(group=ids,color=age_discrete),se=F)+
+  geom_smooth(aes(color="avg"),size=3)
 
 ```
 
