@@ -110,7 +110,7 @@ sumre
 ```{r}
 set.seed(100)
 
-nids=10
+nids=100
 simre=rep(rnorm(nids,mean=0,sd=sumre$ST[[1]][1]),samples/nids)
 simage=runif(samples,-2.5,2.5)
 simage2=simage^2
@@ -140,13 +140,15 @@ simdf_sort=simdf_sort%>%mutate(ids=as.factor(fakeids))
 
 simdf_sort%>%
   ggplot(aes(x=age,y=preds))+
-  geom_smooth(aes(group=ids))+
-  geom_smooth(aes(color="black"))
+  geom_smooth(aes(group=ids),se=F)+
+  geom_smooth(aes(color="black"),size=3)+
+  theme(legend.position="none")
 
 simdf_sort%>%
   ggplot(aes(x=TIME,y=preds))+
-  geom_smooth(aes(group=ids))+
-  geom_smooth(aes(color="black"))
+  geom_smooth(aes(group=ids),se=F)+
+  geom_smooth(aes(color="black"),size=3)+
+  theme(legend.position="none")
 
 ```
 
