@@ -27,7 +27,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r load, include=FALSE, message=FALSE, warning=FALSE}
-trichotomization <- c(0, 20, 30, 100)
+trichotomization <- c(-1000, 6, 25, 120)
 data <- read_sas("data/hearing500lr.sas7bdat") %>%
   mutate(side = as.factor(side),
          id = as.factor(id),
@@ -48,53 +48,108 @@ Q2
 # Random-effects model
 Q2
 
+```{r}
+library(multgee)
+```
+
+```{r}
+fit <- ordLORgee(formula = y_discrete ~ age+I(age^2)+TIME+learning,
+                 link = "logit", id = id, data = data,
+                 LORstr = "time.exch")#category.exch"
+summary(fit)
+
+
+# fit1 <- update(fit, formula = ~. +I(age^3)+ I(TIME^2))
+# waldts(fit, fit1)
+```
+
+```{r}
+load("fit.Rdata")
+```
+
+```{r}
+sum=summary(fit)
+sum
+
+
+plot(x=fit[["fitted.values"]][,1],y=fit[["fitted.values"]][,1])
+plot(x=(data$age+data$TIME),y=fit[["fitted.values"]][,1])
+plot(x=(data$age+data$TIME),y=fit[["fitted.values"]][,2])
+plot(x=(data$age+data$TIME),y=fit[["fitted.values"]][,3])
+
+plot(x=(data$age+data$TIME),y=fit[["fitted.values"]][,1],col="blue",ylim = range(0,1))
+points(x=(data$age+data$TIME),y=fit[["fitted.values"]][,2],col="red")
+points(x=(data$age+data$TIME),y=fit[["fitted.values"]][,3],col="green")
+```
+
 ## Empirical Bayes prediction
 Q3
 
-```{r include=FALSE}
-library(MCMCglmm)
-```
-
-
 
 ```{r}
-model3.1=MCMCglmm(y~age*TIME+I(age^2)+learning,
-                  random=~id,
-                  #rcov=~us(trait):units,
-                  data=data,
-                  family = "gaussian",
-                  thin=10)
+samples=100000
 
+ageden=density(rnorm(samples,mean=fit$coefficients[[3]],sd=sum$coefficients[3,2]))
+age2den=density(rnorm(samples,mean=fit$coefficients[[4]],sd=sum$coefficients[4,2]))
+timeden=density(rnorm(samples,mean=fit$coefficients[[5]],sd=sum$coefficients[5,2]))
+learnden=density(rnorm(samples,mean=fit$coefficients[[5]],sd=sum$coefficients[6,2]))
 
-
-model3.2=MCMCglmm(y_discrete~age*TIME+I(age^2)+learning,
-                  random=~id,
-                  rcov=~us(trait):units,
-                  data=data,
-                  family = "categorical",
-                  thin=10)
-
-
-
-
+plot(ageden)
+plot(age2den)
+plot(timeden)
+plot(learnden)
 ```
 
 ```{r}
-plot(model3.1)
-plot(model3.2)
+library(ordinal)
+load("remod.Rdata")
+sumre=summary(remod)
+sumre
 ```
 
 ```{r}
-library(brms)
+set.seed(100)
+
+nids=10
+simre=rep(rnorm(nids,mean=0,sd=sumre$ST[[1]][1]),samples/nids)
+simage=runif(samples,-2.5,2.5)
+simage2=simage^2
+simTIME=runif(samples,0,20)
+simlearn=sample(c(0,1),samples,replace=T)
+simagetime=simage*simTIME
+
+simmat=matrix(c(simre,simage,simage2,simTIME,simlearn,simagetime,rep(0,samples)),ncol=7)
+
+coefs=matrix(c(1,sumre$coefficients[3:7,1],0),ncol=1)
+
+simpreds=simmat%*%coefs
+
+library(locfit)
+
+simmat[,7]=expit(simpreds)
+
+simdf=as.data.frame(simmat)
+colnames(simdf)=c("re","age","age2","TIME","learn","age:time","preds")
+
+
+simdf_sort=simdf%>%arrange(re,age,TIME)
+
+fakeids=sort(rep(1:nids,samples/nids))
+
+simdf_sort=simdf_sort%>%mutate(ids=as.factor(fakeids))
+
+simdf_sort%>%
+  ggplot(aes(x=age,y=preds))+
+  geom_smooth(aes(group=ids))+
+  geom_smooth(aes(color="black"))
+
+simdf_sort%>%
+  ggplot(aes(x=TIME,y=preds))+
+  geom_smooth(aes(group=ids))+
+  geom_smooth(aes(color="black"))
+
 ```
 
-```{r}
-model3.3=brm(y_discrete~age_measurement+(1+age_measurement|id),data=data,family = categorical(),autocor = cor_ar())
-```
-
-```{r}
-plot(model3.3)
-```
 
 # Transition model
 Q4
