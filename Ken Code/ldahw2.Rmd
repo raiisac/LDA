@@ -53,14 +53,14 @@ library(multgee)
 ```
 
 ```{r}
-fit <- ordLORgee(formula = y_discrete ~ age+I(age^2)+TIME+learning,
-                 link = "logit", id = id, data = data,
-                 LORstr = "time.exch")#category.exch"
-summary(fit)
-
-
-# fit1 <- update(fit, formula = ~. +I(age^3)+ I(TIME^2))
-# waldts(fit, fit1)
+# fit <- ordLORgee(formula = y_discrete ~ age+I(age^2)+TIME+learning,
+#                  link = "logit", id = id, data = data,
+#                  LORstr = "time.exch")#category.exch"
+# summary(fit)
+# 
+# 
+# # fit1 <- update(fit, formula = ~. +I(age^3)+ I(TIME^2))
+# # waldts(fit, fit1)
 ```
 
 ```{r}
@@ -142,18 +142,21 @@ fakeids=sort(rep(1:nids,samples/nids))
 
 simdf_sort=simdf_sort%>%
   mutate(ids=as.factor(fakeids),
-         age_discrete = case_when(age_rescale<30~"<30",
+         age_discrete = case_when(age_rescale<30~"0-30",
                                   age_rescale<50~"30-50",
                                   age_rescale<70~"50-70",
-                                  age_rescale>70~">70")
+                                  age_rescale>70~"70+")
          )
 
-
+thresholds=c(expit(sumre$coefficients[1]),expit(sumre$coefficients[2]))
 
 simdf_sort%>%
   ggplot(aes(x=TIME,y=preds))+
   geom_smooth(aes(group=ids,color=age_discrete),se=F)+
-  geom_smooth(aes(color="avg"),size=3)
+  geom_smooth(aes(color="avg"),size=3)+
+  geom_hline(aes(yintercept =  thresholds[2],linetype="Normal"),color="blue")+
+  geom_hline(aes(yintercept =  thresholds[1],linetype="Excelent"),color="red")
+  
 
 ```
 
