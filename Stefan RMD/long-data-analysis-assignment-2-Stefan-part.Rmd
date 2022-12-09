@@ -59,11 +59,11 @@ $$\log \theta_{tjt'j'} =
 \end{pmatrix}$$
 
 Where the matrix is dimesions of the per subject observations and the 4 zero block on the diagonal comes up because at each time step we have both a left and a right ear. The side of the ear comes up non-signifacnt. \newline
-The next step is model selection which we do with the help of Wald test. We conducted a greedy model selection (both forward by starting with a minimal model and adding variables, and backwards by starting with a full model and removing variables) which fortunately converged. The resulting model was the same as in the model in the previous assignment with the difference having an additional $TIME^2$ term instead of just $TIME$. Given that performance was almost identical we decided to chose a more parsimonious model which is the same as the model we chose in the previous assignment which end up being $hearing_{\{discrete\}}=age \times TIME +age^2+learning$ 
+The next step is model selection which we do with the help of Wald test. We conducted a greedy model selection (both forward by starting with a minimal model and adding variables, and backwards by starting with a full model and removing variables) which fortunately converged. The resulting model was the same as in the model in the previous assignment with the difference having an additional $TIME^2$ term instead of just $TIME$. Given that performance was almost identical we decided to chose a more parsimonious model which is the same as the model we chose in the previous assignment which end up being $hearing_{\{discrete\}}=age \times TIME +age+ +age^2+learning$ 
 
 ```{r include=FALSE}
 #RUNNING TAKES SOME TIME 5-10min 
-fit <- ordLORgee(formula = y_discrete ~ age:TIME+ I(age^2) +learning,
+fit <- ordLORgee(formula = y_discrete ~ age*TIME+ I(age^2) +learning,
                  link = "logit", id = id, data = data1,
                  LORstr = "uniform")
 
