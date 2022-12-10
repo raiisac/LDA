@@ -223,20 +223,19 @@ scaled_ages <- scale(agecat,
                        center = attr(data$age_scale,"scaled:center"),
                        scale = attr(data$age_scale,"scaled:scale"))[,1]
 nDF <- expand.grid(age_scale = scaled_ages,
-                   TIME = seq(0, 22, length.out = 60),
-                   y_discrete = levels(data$y_discrete)) %>%
+                   TIME = seq(0, 22, length.out = 60)) %>%
   mutate(learning = (TIME == 0),
          `I(age_scale^2)` = age_scale^2,
          `age_scale:TIME` = age_scale*TIME) %>%
-  dplyr::select(y_discrete, names(coef(remod))[-c(1,2)]) 
+  dplyr::select(names(coef(remod))[-c(1,2)]) 
 #excellent|normal Note that it's beta[1] !-! SUM(other coefficients*covaraites) see expression (1) in https://cran.r-project.org/web/packages/ordinal/vignettes/clm_article.pdf
 pred_excellent_normal_fixed <- as.numeric(coef(remod)[1]) -
                                  as.numeric(t(as.vector(coef(remod)[-c(1,2)])) %*%
-                                 unlist(t(as.matrix(nDF[,-1]))))
+                                 unlist(t(as.matrix(nDF))))
 #normal/hearing loss
 pred_normal_hl_fixed <- as.numeric(coef(remod)[2]) -
                                  as.numeric(t(as.vector(coef(remod)[-c(1,2)])) %*%
-                                 unlist(t(as.matrix(nDF[,-1]))))
+                                 unlist(t(as.matrix(nDF))))
 #number of randomly drawn numbers
 n <- 2000
 randomnumbers <- rnorm(n, mean = 0, sd = remod$ST$id_integer[1])
