@@ -114,17 +114,33 @@ data %>%
 ```
 
 # Methodology
+
+As discussed in the previous section, the dependent variable will be split up into three categories. As such, the dependent variable is tranformed from a continuous (integer) variable into an ordinal one where excellent hearing is the lowest level and hearing loss is the highest.
+
+In congruence with previous analysis, the ordinal model will be proportional odds logistic regression:
+
+\begin{equation}
+\left\{
+                \begin{array}{ll}
+                  logit[P(Y_i\leq Excellent|x_i)] = \alpha_1 + \beta_{1}age_i +  \beta_{2}TIME_i + \beta_{3}learning_i + \\ \hspace{5cm} \beta_{4}age^2_i + \beta_{5}age_i*TIME_i \\
+                  logit[P(Y_i\leq Normal|x_i)] = \alpha_2 + \beta_{1}age_i + \beta_{2}TIME_i + \beta_{3}learning_i + \\ \hspace{5cm} \beta_{4}age^2_i + \beta_{5}age_i*TIME_i 
+                \end{array}
+              \right.
+(\#eq:Ordinal)
+\end{equation}
+
 All analysis was done in R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA). 
 
 
 # Results
+
 ## Marginal model
 First, we fit a marginal model with the *ordLORgee* from the **multgee**. This function allows for an ordinal dependent variable which is appropriate for our data.
 
 ```{r loadgee, echo=FALSE, message = FALSE, warning = FALSE, eval = file.exists("Stefan RMD/fit.Rdata")}
 #if the R object exists, load it to avoid long calculation times. If not, fit the model on the fly and same the object
 library(multgee)
-load("Stefan RMD/fit.Rdata")
+load("Stefan RMD/fit_gee.Rdata")
 ```
 
 ```{r fitgee, echo=FALSE, message = FALSE, eval = !file.exists("Stefan RMD/fit.Rdata")}
@@ -132,7 +148,7 @@ load("Stefan RMD/fit.Rdata")
 library(multgee)
 fit <- ordLORgee(formula = y_discrete ~ age*TIME + I(age^2) +learning,
                  link = "logit", id = id, data = data,
-                 LORstr = "time.exch")#category.exch"
+                 LORstr = "uniform")#category.exch"
 ```
 
 ```{r geepredictions, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 5}
@@ -146,7 +162,9 @@ nDF <- expand.grid(age = agecat,
 ```
 
 ## Random-effects model
-The random effects model only includes a random intercept since it did not converge with random slopes included. 
+
+On top of the fixed effects (equation \@ref(eq:Ordinal)), the random effects model only includes a random intercept since it did not converge with random slopes included. The covariate $age$ was also standardized and centered to improve convergence.
+
 ```{r fitremod, echo=FALSE, message = FALSE, cache=TRUE}
 remod <- clmm(y_discrete ~ age_scale*TIME + learning + I(age_scale^2) +
                (1|id_integer), #doesn't work with random slopes
@@ -160,7 +178,13 @@ expit <- function(x){1/(1 + exp(-x))}
 
 The random intercept has a variance (standard deviation) of `r round(remod$ST$id_integer[1]^2,2)` (`r round(remod$ST$id_integer[1],2)`).
 
-```{r REpredictions, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 5}
+
+
+### Empirical Bayes prediction
+
+To infer the marginal evolution of hearing loss over time, one cannot simply set the random intercept equal to zero to calculate the prediction. This is because the expectation of a logit function is not equal to the logit of the expectation. Figure \@ref(fig:REpredictions) shows the evolutions for the average subjects of a certain age (where $b_i=0$) to the marginal evolutions (integrated GLMM). The latter are used to get marginal predictions for each of the ordinal levels in Figure \@ref(fig:REmarginalpredictions). This figure clearly shows the learning effect at $TIME==0$. The youngest subject have the highest probability of having excellent hearing and that probability goes down as time progresses. For older subjects, there seems to be a tipping point where the probability of having normal hearing starts to go down, as the probability of having hearing loss steeply increases. 
+
+```{r REpredictions, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 4, fig.cap = "Marginal predictions versus the evolutions for the average subjects"}
 agecat <- c(20,30,40,50,60,70)
 scaled_ages <- scale(agecat,
                        center = attr(data$age_scale,"scaled:center"),
@@ -227,11 +251,12 @@ nDF %>% pivot_longer(cols = c(pred_excellent_normal_naive,
                            color = age,
                            lty = probability,
                            alpha = naive)) +
-  scale_alpha_manual(breaks = c(TRUE, FALSE), values = c(0.5, 1)) +
+  scale_alpha_manual(breaks = c(TRUE, FALSE), values = c(0.4, 1), name = "", 
+                     labels = c("Evolutions average subjects", "Marginal evolution")) +
   ylim(0,1) + theme_bw()
 ```
 
-```{r REmarginalpredictions, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 5}
+```{r REmarginalpredictions, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 4, fig.cap= "Marginal evolutions"}
 nDF %>%
   mutate(Excellent = pred_excellent_normal,
          Normal = pred_normal_hl - pred_excellent_normal,
@@ -239,18 +264,61 @@ nDF %>%
   pivot_longer(cols = c(Excellent, Normal, Hearingloss),
                      values_to = "Prediction",
                      names_to = "Type") %>%
+  mutate(Type = factor(as.factor(Type), 
+                       levels = c('Excellent', 'Normal', 'Hearingloss'), 
+                       labels = c('Excellent', 'Normal', 'Hearing loss'), 
+                       ordered = TRUE)) %>%
   ggplot() + geom_line(aes(y = Prediction,
                            x = TIME, group = interaction(Type, age),
-                           color = age,
-                           lty = Type)) +
-  ylim(0,1) + theme_bw()
+                           color = age)) +
+  theme_bw() + ylab("Probability prediction") +
+  facet_grid(cols = vars(Type)) + 
+  theme(legend.position = "bottom")
 ```
 
-### Empirical Bayes prediction
-Q3
+
+```{r EBestimates, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 4, fig.cap= "Empirical Bayes (EB) estimates"}
+ranef <- data.frame(ranef = remod$ranef,
+                    id = as.factor(1:length(remod$ranef)))
+maxfollowup <- data %>% group_by(id) %>%
+  summarize(maxfollowup = max(TIME),
+            nbvisits = n()) %>%
+  ungroup()
+p1 <- data %>% left_join(ranef) %>% 
+  ggplot() + geom_histogram(aes(x = ranef,
+                                y = (..count..)/sum(..count..)),
+                            bins = 50) +
+  theme_bw() + xlab("Empirical bayes estimate \nfor the random intercept") + 
+  ylab("Percentage") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1L)) 
+p2 <- data %>% left_join(ranef) %>% 
+  left_join(maxfollowup) %>%
+  ggplot() + geom_point(aes(x=ranef, y = age, 
+                            color = maxfollowup),
+                        alpha = 0.7) +
+  geom_vline(aes(xintercept = 0))  + theme_bw() +
+  xlab("Empirical bayes estimate \nfor the random intercept") +
+  ylab('Age at the start of the study') +
+  scale_color_continuous(name = "Follow-up time (years)")+
+  theme(legend.position = "bottom")
+
+p1 + p2 
+
+
+outliers <- data %>% left_join(ranef) %>% 
+  left_join(maxfollowup) %>%
+  filter(abs(ranef) > 5) %>%
+  group_by(id, age, maxfollowup) %>%
+  summarize(nbvisits = n()) %>%
+  ungroup()
+```
+
+Apart from the marginal evolution, we can also get empirical bayes estimates for all subjects.  Figure \@ref(fig:EBestimates) shows the distribution of the random intercept on the left and the scatterplot on the right shows how the random intercepts related to the subject's age and follow-up time. 
+It can be seen that there are more outliers on the right, meaning that these subjects have higher than expected hearing threshold i.e. a higher than expected probability of hearing loss. There are `r nrow(outliers)` subjects with EB estimate > 5. `r sum(outliers$maxfollowup>10)` of these subjects were followed up more than 10 years and they range from age `r min(outliers$age)` to `r max(outliers$age)`. In the current dataset, no clear reason can be find as to why these subjects deviate so much from expectation. It would be interesting to try to link the EB estimates to other characteristics that might influence hearing such as occupation for example.
+
 
 ## Transition model
-Q4
+
 
 # Discussion
 
