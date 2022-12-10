@@ -50,6 +50,8 @@ data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
          learning = 1*(TIME == 0)) %>%
   arrange(id)
 mediansplit <- cut_number(data$y, n = 3)
+
+expit <- function(x){1/(1 + exp(-x))}
 ```
 
 # Data trichotomization
@@ -168,15 +170,68 @@ sgee %>% as.data.frame %>%
         col.names = c("Parameter", "Estimate", "Odds"))
 ```
 
-```{r geepredictions, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 5}
+```{r geepredictions, echo=FALSE, message = FALSE, fig.width = 12, fig.height = 7, fig.cap = "Predictions from the marginal model."}
 agecat <- c(20,30,40,50,60,70)
 nDF <- expand.grid(age = agecat,
                    TIME = seq(0, 22, length.out = 60)) %>%
   mutate(learning = (TIME == 0),
          `I(age^2)` = age^2,
-         `age:TIME` = age*TIME)
+         `age:TIME` = age*TIME) %>%
+  dplyr::select(names(coef(fit))[-c(1,2)]) 
 #age:TIME is not yet in fit
+
+nDF <- expand.grid(age = agecat,
+                   TIME = seq(0, 22, length.out = 60)) %>%
+  mutate(learning = (TIME == 0),
+         `I(age^2)` = age^2,
+         `age:TIME` = age*TIME) %>%
+  dplyr::select(names(coef(fit))[-c(1,2)]) 
+#here, the covariates are summed to the intercept ><remod
+pred_10_fixed <- as.numeric(coef(fit)[1]) +
+                                 as.numeric(t(as.vector(coef(fit)[-c(1,2)])) %*%
+                                 unlist(t(as.matrix(nDF))))
+#normal/hearing loss
+pred_20_fixed <- as.numeric(coef(fit)[2]) +
+                                 as.numeric(t(as.vector(coef(fit)[-c(1,2)])) %*%
+                                 unlist(t(as.matrix(nDF))))
+nDF <- nDF %>%
+  mutate(pred_10 = expit(pred_10_fixed),
+         pred_20 = expit(pred_20_fixed))
+p1 <- nDF %>% pivot_longer(cols = c(pred_10,
+                              pred_20),
+                     values_to = "Prediction",
+                     names_to = "Type") %>%
+  mutate(probability = ifelse(str_detect(Type, "10"),
+                              "Normal|Excellent",
+                              "Hearing Loss|\nExcellent")) %>%
+  ggplot() + geom_line(aes(y = Prediction,
+                           x = TIME, group = interaction(Type, age),
+                           color = as.factor(age),
+                           lty = probability)) +
+  ylim(0,1) + theme_bw() + 
+  scale_color_discrete(name = "Age")
+p2 <- nDF %>%
+  mutate(Excellent = pred_10,
+         Normal = pred_20 - pred_10,
+         Hearingloss = 1 - pred_20) %>%
+  pivot_longer(cols = c(Excellent, Normal, Hearingloss),
+                     values_to = "Prediction",
+                     names_to = "Type") %>%
+  mutate(Type = factor(as.factor(Type), 
+                       levels = c('Excellent', 'Normal', 'Hearingloss'), 
+                       labels = c('Excellent', 'Normal', 'Hearing loss'), 
+                       ordered = TRUE)) %>%
+  ggplot() + geom_line(aes(y = Prediction,
+                           x = TIME, group = interaction(Type, age),
+                           color = as.factor(age))) +
+  theme_bw() + ylab("Probability prediction") +
+  facet_grid(cols = vars(Type)) + 
+  theme(legend.position = "none")
+p1 + p2 + 
+  plot_layout(widths = c(1, 2))
+
 ```
+
 
 ## Random-effects model
 
@@ -190,7 +245,6 @@ remod <- clmm(y_discrete ~ age_scale*TIME + learning + I(age_scale^2) +
 #                 random = id_integer, #doesn't work with random slopes
 #              data = data,
 #              Hess = TRUE)
-expit <- function(x){1/(1 + exp(-x))}
 ```
 
 ```{r retable, echo=FALSE, message = FALSE}
