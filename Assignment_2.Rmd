@@ -135,7 +135,7 @@ All analysis was done in R. All scripts are freely available at [this git reposi
 # Results
 
 ## Marginal model
-First, we fit a marginal model with the *ordLORgee* from the **multgee**. This function allows for an ordinal dependent variable which is appropriate for our data.
+First, we fit a marginal model with the *ordLORgee* from the **multgee**. This function allows for an ordinal dependent variable which is appropriate for our data. The result is shown in Table \@ref(tab:geetable). 
 
 ```{r loadgee, echo=FALSE, message = FALSE, warning = FALSE, eval = file.exists("Stefan RMD/fit.Rdata")}
 #if the R object exists, load it to avoid long calculation times. If not, fit the model on the fly and same the object
@@ -149,6 +149,23 @@ library(multgee)
 fit <- ordLORgee(formula = y_discrete ~ age*TIME + I(age^2) +learning,
                  link = "logit", id = id, data = data,
                  LORstr = "uniform")#category.exch"
+```
+
+```{r geetable, echo=FALSE, message = FALSE}
+sgee <- summary(fit)$coefficients 
+sgee <- sgee[c(1:4,6,5, 7),] #swap learning and age squared to be the same as in the mixed model
+sgee %>% as.data.frame %>%
+  mutate(var = c("$\\alpha_1$", "$\\alpha_2$", rownames(sgee)[3:5], 
+                 "age$^2$", rownames(sgee)[7]),
+         estimate = sprintf("%.2f %s", Estimate, stars.pval(`Pr(>|san.z|)`)),
+         odds = round(exp(Estimate),2)) %>%
+  dplyr::select(var, estimate, odds) %>%
+  kable(booktabs = TRUE,
+        caption = "Estimated GEE model",
+        row.names = FALSE,
+        escape = FALSE,
+        format = "latex",
+        col.names = c("Parameter", "Estimate", "Odds"))
 ```
 
 ```{r geepredictions, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 5}
@@ -174,6 +191,22 @@ remod <- clmm(y_discrete ~ age_scale*TIME + learning + I(age_scale^2) +
 #              data = data,
 #              Hess = TRUE)
 expit <- function(x){1/(1 + exp(-x))}
+```
+
+```{r retable, echo=FALSE, message = FALSE}
+sre <- summary(remod)$coefficients 
+sre %>% as.data.frame %>%
+  mutate(var = c("$\\alpha_1$", "$\\alpha_2$", "age$_{scale}$", "TIME",
+                 "learning", "age$^2_{scale}$", "age$_{scale}$*TIME"),
+         estimate = sprintf("%.2f %s", Estimate, stars.pval(`Pr(>|z|)`)),
+         odds = round(exp(Estimate),2)) %>%
+  dplyr::select(var, estimate, odds) %>%
+  kable(booktabs = TRUE,
+        caption = "Estimated mixed effects model",
+        row.names = FALSE,
+        escape = FALSE,
+        format = "latex",
+        col.names = c("Parameter", "Estimate", "Odds"))
 ```
 
 The random intercept has a variance (standard deviation) of `r round(remod$ST$id_integer[1]^2,2)` (`r round(remod$ST$id_integer[1],2)`).
