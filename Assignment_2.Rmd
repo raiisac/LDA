@@ -119,18 +119,6 @@ data %>%
 
 As discussed in the previous section, the dependent variable will be split up into three categories. As such, the dependent variable is tranformed from a continuous (integer) variable into an ordinal one where excellent hearing is the lowest level and hearing loss is the highest.
 
-In congruence with previous analysis, the ordinal model will be proportional odds logistic regression:
-
-\begin{equation}
-\left\{
-                \begin{array}{ll}
-                  logit[P(Y_i\leq Excellent|x_i)] = \alpha_1 + \beta_{1}age_i +  \beta_{2}TIME_i + \beta_{3}learning_i + \\ \hspace{5cm} \beta_{4}age^2_i + \beta_{5}age_i*TIME_i \\
-                  logit[P(Y_i\leq Normal|x_i)] = \alpha_2 + \beta_{1}age_i + \beta_{2}TIME_i + \beta_{3}learning_i + \\ \hspace{5cm} \beta_{4}age^2_i + \beta_{5}age_i*TIME_i 
-                \end{array}
-              \right.
-(\#eq:Ordinal)
-\end{equation}
-
 All analysis was done in R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA). 
 
 
@@ -138,6 +126,34 @@ All analysis was done in R. All scripts are freely available at [this git reposi
 
 ## Marginal model
 First, we fit a marginal model with the *ordLORgee* from the **multgee**. This function allows for an ordinal dependent variable which is appropriate for our data. The result is shown in Table \@ref(tab:geetable). 
+
+We conduct the GEE analysis in two steps. First we selected a structure for the marginalized local odds ratios. The full specification is given by 
+$$\log \theta_{tjt'j'}=\phi^{(t,t')}(\mu_{j}^{t,t'}-\mu_{j+1}^{t,t'})(\mu_{j'}^{t,t'}-\mu_{j'+1}^{t,t'})$$ 
+where $\{\mu_{j}^{t,t'};j=1\dots J\}$ are the score parameters for the $J$ response at the time pair $\{t,t'\}$ and $\phi^{(t,t')}$ is the intrinsic parameter. We nevertheless chose to select a uniform structure i.e. just a fixed $\phi$. Both a categorically exchangeable structure (i.e $\phi^{\{t,t'\}}$) and a time exchangeable structure (i.e.$\phi(\mu_{j'}-\mu_{j'+1})$) gave estimates functionally very close to a constant. The final log local odds ratios have the following form where the size of the matrix depends on the number of observations per subject.
+
+$$\log \theta_{tjt'j'} = 
+\begin{pmatrix}
+0 & 0 & \phi & \phi & \cdots & \phi & \phi \\
+0 & 0 & \phi & \phi &\cdots & \phi & \phi \\
+\phi & \phi & 0 & 0 &\cdots & \phi & \phi \\
+\phi & \phi & 0 & 0 &\cdots & \phi & \phi \\
+\vdots  & \vdots & \vdots & \vdots  & \ddots & \vdots & \vdots  \\
+\phi & \phi & \phi & \phi & \cdots &  0 & 0 \\
+\phi & \phi & \phi & \phi & \cdots &  0 & 0
+\end{pmatrix}$$
+
+Where the matrix is dimensions of the per subject observations and the 4 zero block on the diagonal comes up because at each time step we have both a left and a right ear. The side of the ear comes up non-significant. \newline
+The next step is model selection which we do with the help of Wald test. We conducted a greedy model selection (both forward by starting with a minimal model and adding variables, and backwards by starting with a full model and removing variables) which fortunately converged. The resulting model was the same as in the model in the previous assignment. 
+
+\begin{equation}
+\left\{
+                \begin{array}{ll}
+                  logit[P(Y_i\leq Normal|x_i)] = \alpha_1 + \beta_{1}age_i +  \beta_{2}TIME_i + \beta_{3}learning_i + \\ \hspace{5cm} \beta_{4}age^2_i + \beta_{5}age_i*TIME_i \\
+                  logit[P(Y_i\leq Hearing Loss|x_i)] = \alpha_2 + \beta_{1}age_i + \beta_{2}TIME_i + \beta_{3}learning_i + \\ \hspace{5cm} \beta_{4}age^2_i + \beta_{5}age_i*TIME_i 
+                \end{array}
+              \right.
+(\#eq:Ordinal)
+\end{equation}
 
 ```{r loadgee, echo=FALSE, message = FALSE, warning = FALSE, eval = file.exists("Stefan RMD/fit.Rdata")}
 #if the R object exists, load it to avoid long calculation times. If not, fit the model on the fly and same the object
@@ -237,6 +253,22 @@ p1 + p2 +
 
 On top of the fixed effects (equation \@ref(eq:Ordinal)), the random effects model only includes a random intercept since it did not converge with random slopes included. The covariate $age$ was also standardized and centered to improve convergence.
 
+Here we again use a greedy approach and for the model selection criterion we use the $AIC$ and come up with the model in equation \@ref(eq:Ordinal-MM). 
+
+\begin{equation}
+\left\{
+                \begin{array}{ll}
+                  logit[P(Y_i\leq Excellent|x_i)] = \alpha_1 + \beta_{1}age_i +  \beta_{2}TIME_i + \beta_{3}learning_i + \\ \hspace{5cm} \beta_{4}age^2_i + \beta_{5}age_i*TIME_i + b_i\\
+                  logit[P(Y_i\leq Normal|x_i)] = \alpha_2 + \beta_{1}age_i + \beta_{2}TIME_i + \beta_{3}learning_i + \\ \hspace{5cm} \beta_{4}age^2_i + \beta_{5}age_i*TIME_i + b_i \\
+                  b_i \sim N(0,\sigma^2)
+                \end{array}
+              \right.
+(\#eq:Ordinal-MM)
+\end{equation}
+
+Notice that the $\alpha$'s are slightly differently defined than in the GEE model
+
+
 ```{r fitremod, echo=FALSE, message = FALSE, cache=TRUE}
 remod <- clmm(y_discrete ~ age_scale*TIME + learning + I(age_scale^2) +
                (1|id_integer), #doesn't work with random slopes
@@ -264,10 +296,6 @@ sre %>% as.data.frame %>%
 ```
 
 The random intercept has a variance (standard deviation) of `r round(remod$ST$id_integer[1]^2,2)` (`r round(remod$ST$id_integer[1],2)`).
-
-
-
-### Empirical Bayes prediction
 
 To infer the marginal evolution of hearing loss over time, one cannot simply set the random intercept equal to zero to calculate the prediction. This is because the expectation of a logit function is not equal to the logit of the expectation. Figure \@ref(fig:REpredictions) shows the evolutions for the average subjects of a certain age (where $b_i=0$) to the marginal evolutions (integrated GLMM). The latter are used to get marginal predictions for each of the ordinal levels in Figure \@ref(fig:REmarginalpredictions). This figure clearly shows the learning effect at $TIME==0$. The youngest subject have the highest probability of having excellent hearing and that probability goes down as time progresses. For older subjects, there seems to be a tipping point where the probability of having normal hearing starts to go down, as the probability of having hearing loss steeply increases. 
 
@@ -353,8 +381,8 @@ nDF %>%
   mutate(Type = factor(as.factor(Type), 
                        levels = c('Excellent', 'Normal', 'Hearingloss'), 
                        labels = c('Excellent', 'Normal', 'Hearing loss'), 
-                       ordered = TRUE)) %>%
-  ggplot() + geom_line(aes(y = Prediction,
+                       ordered = TRUE)) -> pred
+pred %>% ggplot() + geom_line(aes(y = Prediction,
                            x = TIME, group = interaction(Type, age),
                            color = age)) +
   theme_bw() + ylab("Probability prediction") +
@@ -362,6 +390,8 @@ nDF %>%
   theme(legend.position = "bottom")
 ```
 
+
+### Empirical Bayes prediction
 
 ```{r EBestimates, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 4, fig.cap= "Empirical Bayes (EB) estimates"}
 ranef <- data.frame(ranef = remod$ranef,
@@ -402,12 +432,64 @@ outliers <- data %>% left_join(ranef) %>%
 Apart from the marginal evolution, we can also get empirical bayes estimates for all subjects.  Figure \@ref(fig:EBestimates) shows the distribution of the random intercept on the left and the scatterplot on the right shows how the random intercepts related to the subject's age and follow-up time. 
 It can be seen that there are more outliers on the right, meaning that these subjects have higher than expected hearing threshold i.e. a higher than expected probability of hearing loss. There are `r nrow(outliers)` subjects with EB estimate > 5. `r sum(outliers$maxfollowup>10)` of these subjects were followed up more than 10 years and they range from age `r min(outliers$age)` to `r max(outliers$age)`. In the current dataset, no clear reason can be find as to why these subjects deviate so much from expectation. It would be interesting to try to link the EB estimates to other characteristics that might influence hearing such as occupation for example.
 
+Figure \@ref(fig:EBestimates-individuals) shows the individually predicted evolution for a subset of subjects that have an age that is at most 1 year older or younger than the shown marginal evolutions. 
+
+```{r EBestimates-individuals, echo=FALSE, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 4, fig.cap= "The dashed lines are predictions for individuals in the dataset (including random effect). Full lines are the marginal evolutions."}
+# we pick all individuals that are at most one year younger or one year older than the focus ages that were chosen.
+data %>%
+  filter(age>=agecat-1 & age<=agecat+1) %>%
+  mutate(age = round(age/10)*10) %>%
+  mutate(`I(age_scale^2)` = age_scale^2,
+         `age_scale:TIME` = age_scale*TIME) %>%
+  left_join(ranef) %>% 
+  mutate(pred_excellent_normal = 
+           expit(as.numeric(coef(remod)[1]) -
+                   coef(remod)[3] * age_scale - 
+                   coef(remod)[4] * TIME -
+                   coef(remod)[5] * learning - 
+                   coef(remod)[6] * `I(age_scale^2)` - 
+                   coef(remod)[7] * `age_scale:TIME`-
+                   ranef) 
+           ,
+         pred_normal_hl = 
+           expit(as.numeric(coef(remod)[2]) -
+                   coef(remod)[3] * age_scale - 
+                   coef(remod)[4] * TIME -
+                   coef(remod)[5] * learning - 
+                   coef(remod)[6] * `I(age_scale^2)` - 
+                   coef(remod)[7] * `age_scale:TIME` - 
+                   ranef),
+         Excellent = pred_excellent_normal,
+         Normal = pred_normal_hl - pred_excellent_normal,
+         Hearingloss = 1 - pred_normal_hl) %>%
+  pivot_longer(cols = c(Excellent, Normal, Hearingloss),
+                     values_to = "Prediction",
+                     names_to = "Type") %>%
+  mutate(Type = factor(as.factor(Type), 
+                       levels = c('Excellent', 'Normal', 'Hearingloss'), 
+                       labels = c('Excellent', 'Normal', 'Hearing loss'), 
+                       ordered = TRUE)) -> id_predictions
+
+
+ggplot() + geom_line(data = pred, aes(y = Prediction,
+                           x = TIME, group = interaction(Type, age),
+                           color = as.factor(age)), size = 1.2) +
+  geom_line(data = id_predictions, aes(y = Prediction,
+                           x = TIME, group = id,
+                           color = as.factor(age)), lty = 2) +
+  theme_bw() + ylab("Probability prediction") +
+  facet_grid(cols = vars(Type)) + 
+  theme(legend.position = "bottom") +
+  scale_color_discrete(name = "Age")
+  
+  
+```
 
 ## Transition model
 
 
 # Discussion
-
+As expected, the marginal model and the mixed effects model gave similar results in terms of how the covariates influence hearing loss. It is important to note that there is a difference between the interpretation of these two models. The marginal model is more useful when we are interested in results pertaining to the entire population, while mixed models are more suited to answering question regarding an individual in said population. The choice of model will therefore be motivated by the research question.
 
 # Bibliography
 
