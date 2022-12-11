@@ -494,6 +494,10 @@ data %>%
   scale_color_manual(values = c("green","red","blue"))+
   theme_bw()
 ```
+As is evident from figures 3 and 5, the results of this analysis confirm the formal results from the previous section.  These results being that the observed probability of maintaining excellent hearing decreases over time and by extension the probability of developing hearing loss increases over time. Additionally, different age groups have varying baseline hearing capacities; with baseline hearing thresholds decreasing sharply as they age. As was the case in the previous assignment, the learning effect appears to artificially deflate the patients' observed hearing capabilities for their first record; lowering their probability of having excellent hearing and thus inflating their probability of having normal/reduced hearing. These results are then supported by figure 6 which details the calculated relation between Age, Time, and an individual patient's probability of having a given level of hearing capacity according to the CLMM model. This plot clearly shows various hearing evolutions clustered according to the patients respective age and length of participation.
+
+Figure 4 details the empirically measured distribution of the calculated random effects. From these figures we observe that the empirical distribution of random effects agrees with the assumption of well formed normality; lacking excessive skew or kurtosis. Additionally, the figures also show that the random intercept is largely independent of both starting age and time spent in the study. Confirming results from the previous section, these findings show that starting age and time based effects would be best fit as fixed effects.
+
 
 ## Transition model
 
