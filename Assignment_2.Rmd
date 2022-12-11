@@ -56,7 +56,7 @@ expit <- function(x){1/(1 + exp(-x))}
 
 # Data trichotomization
 
-To trichotomize the data, suitable cut-off points need to be found. The cutoff points are often chosen based on either  expert knowledge or so as to optimize predictive power. An easy, often used method for dichotomization is a median-split since it assures that there are an equal amount of observation at either side of the cut-off value. Similarly, for trichotomization, we could aim for approximately 33.33% of the observations in each of the three categories. That would result in the following three categories: `r sprintf("%s, %s, %s",levels(mediansplit)[1],levels(mediansplit)[2],levels(mediansplit)[3])`.
+To trichotomize the data, suitable cut-off points need to be found. The cut-off points are often chosen based on either  expert knowledge or so as to optimize predictive power. An easy, often used method for dichotomization is a median-split since it assures that there are an equal amount of observation at either side of the cut-off value. Similarly, for trichotomization, we could aim for approximately 33.33% of the observations in each of the three categories. That would result in the following three categories: `r sprintf("%s, %s, %s",levels(mediansplit)[1],levels(mediansplit)[2],levels(mediansplit)[3])`.
 
 It is quite common in literature to dichotomize hearing loss into normal hearing (\leq25 dB) and hearing loss (>25 dB) [see @garinis2017cumulative; @gallagher2019; @ju2022long, for example]. However, thichotomization is less common and it should be noted that it is generally not advised to discretize continuous data since some information is inevitably lost [@doi:10.1080/03610926.2016.1248783; @maccallum2002practice]. 
 
@@ -91,7 +91,7 @@ data_clark %>%
   kable_styling(latex_options = "HOLD_position")
 ```
 
-Table \@ref(tab:clark) shows that, in this dataset, there is no one in the severe hearing loss categories and the large majority has normal hearing (`r round(data_clark[1, "nperc"],2)`%). The median for all observation with normal hearing (\leq 25dB) is 6 dB. We therefor suggest to trichotomize the data into the following categories:
+Table \@ref(tab:clark) shows that, in this dataset, there is no one in the severe hearing loss categories and the large majority has normal hearing (`r round(data_clark[1, "nperc"],2)`%). The median for all observation with normal hearing (\leq 25dB) is 6 dB. We therefore suggest to trichotomize the data into the following categories (Table \@ref(tab:ydiscrete)):
 
 - \leq 6 dB: Excellent hearing
 - 7 - 25 dB: Normal hearing
@@ -125,11 +125,11 @@ All analysis was done in R. All scripts are freely available at [this git reposi
 # Results
 
 ## Marginal model
-First, we fit a marginal model with the *ordLORgee* from the **multgee**. This function allows for an ordinal dependent variable which is appropriate for our data. The result is shown in Table \@ref(tab:geetable). 
+First, we fit a marginal model with the *ordLORgee* from the **multgee** package. This function allows for an ordinal dependent variable which is appropriate for our data. 
 
-We conduct the GEE analysis in two steps. First we selected a structure for the marginalized local odds ratios. The full specification is given by 
+We conduct the GEE analysis in two steps as in @touloumis2014r. First we selected a structure for the marginalized local odds ratios. The full specification is given by 
 $$\log \theta_{tjt'j'}=\phi^{(t,t')}(\mu_{j}^{t,t'}-\mu_{j+1}^{t,t'})(\mu_{j'}^{t,t'}-\mu_{j'+1}^{t,t'})$$ 
-where $\{\mu_{j}^{t,t'};j=1\dots J\}$ are the score parameters for the $J$ response at the time pair $\{t,t'\}$ and $\phi^{(t,t')}$ is the intrinsic parameter. We nevertheless chose to select a uniform structure i.e. just a fixed $\phi$. Both a categorically exchangeable structure (i.e $\phi^{\{t,t'\}}$) and a time exchangeable structure (i.e.$\phi(\mu_{j'}-\mu_{j'+1})$) gave estimates functionally very close to a constant. The final log local odds ratios have the following form where the size of the matrix depends on the number of observations per subject.
+where $\{\mu_{j}^{t,t'};j=1\dots J\}$ are the score parameters for the $J$ response at the time pair $\{t,t'\}$ and $\phi^{(t,t')}$ is the intrinsic parameter. We nevertheless chose to select a uniform structure i.e. just a fixed $\phi$. Both a categorically exchangeable structure (i.e $\phi^{\{t,t'\}}$) and a time exchangeable structure (i.e.$\phi(\mu_{j'}-\mu_{j'+1})$) gave estimates that are very close to a constant. The final log local odds ratios have the following form where the size of the matrix depends on the number of observations per subject.
 
 $$\log \theta_{tjt'j'} = 
 \begin{pmatrix}
@@ -143,7 +143,7 @@ $$\log \theta_{tjt'j'} =
 \end{pmatrix}$$
 
 Where the matrix is dimensions of the per subject observations and the 4 zero block on the diagonal comes up because at each time step we have both a left and a right ear. The side of the ear comes up non-significant. \newline
-The next step is model selection which we do with the help of Wald test. We conducted a greedy model selection (both forward by starting with a minimal model and adding variables, and backwards by starting with a full model and removing variables) which fortunately converged. The resulting model was the same as in the model in the previous assignment. 
+The next step is model selection which we do with the help of Wald test. We conducted a greedy model selection (both forward by starting with a minimal model and adding variables, and backwards by starting with a full model and removing variables) which fortunately converged. The resulting model was the same as in the model in the previous assignment (model specifications in equation \@ref(eq:Ordinal)). 
 
 \begin{equation}
 \left\{
@@ -154,6 +154,8 @@ The next step is model selection which we do with the help of Wald test. We cond
               \right.
 (\#eq:Ordinal)
 \end{equation}
+
+
 
 ```{r loadgee, echo=FALSE, message = FALSE, warning = FALSE, eval = file.exists("Stefan RMD/fit.Rdata")}
 #if the R object exists, load it to avoid long calculation times. If not, fit the model on the fly and same the object
@@ -176,8 +178,8 @@ sgee %>% as.data.frame %>%
   mutate(var = c("$\\alpha_1$", "$\\alpha_2$", rownames(sgee)[3:5], 
                  "age$^2$", rownames(sgee)[7]),
          estimate = sprintf("%.2f %s", Estimate, stars.pval(`Pr(>|san.z|)`)),
-         odds = round(exp(Estimate),2)) %>%
-  dplyr::select(var, estimate, odds) %>%
+         odds = round(exp(Estimate),2)) -> sgee
+sgee %>% dplyr::select(var, estimate, odds) %>%
   kable(booktabs = TRUE,
         caption = "Estimated GEE model",
         row.names = FALSE,
@@ -185,6 +187,8 @@ sgee %>% as.data.frame %>%
         format = "latex",
         col.names = c("Parameter", "Estimate", "Odds"))
 ```
+
+The result is shown in Table \@ref(tab:geetable). Figure \@ref(fig:geepredictions) shows the marginal probabilities for different age categories. The odds in Table \@ref(tab:geetable) are calculated as $exp(\beta_i)$. As an example for learning, $exp($`r round(sgee[sgee$var =="learning", "Estimate"],2)` $)=$ `r round(sgee[sgee$var =="learning", "odds"],2)` which means that when $TIME==0$, subjects have a `r (1-sgee[sgee$var =="learning", "odds"])*100`% lower odds of having better hearing (excellent versus normal or normal versus hearing loss).
 
 ```{r geepredictions, echo=FALSE, message = FALSE, fig.width = 12, fig.height = 7, fig.cap = "Predictions from the marginal model."}
 agecat <- c(20,30,40,50,60,70)
@@ -251,7 +255,7 @@ p1 + p2 +
 
 ## Random-effects model
 
-On top of the fixed effects (equation \@ref(eq:Ordinal)), the random effects model only includes a random intercept since it did not converge with random slopes included. The covariate $age$ was also standardized and centered to improve convergence.
+On top of the fixed effects (equation \@ref(eq:Ordinal)), the random effects model includes a random intercept for each subject, estimated with the *clmm* function from the **ordinal** package. Random slopes were not included since a model with random slopes did not converge. The covariate $age$ was also standardized and centered to improve convergence. Thereforse, the odds are not directly comparable to the odds in Table \@ref(tab:geetable).
 
 Here we again use a greedy approach and for the model selection criterion we use the $AIC$ and come up with the model in equation \@ref(eq:Ordinal-MM). 
 
@@ -266,7 +270,6 @@ Here we again use a greedy approach and for the model selection criterion we use
 (\#eq:Ordinal-MM)
 \end{equation}
 
-Notice that the $\alpha$'s are slightly differently defined than in the GEE model
 
 
 ```{r fitremod, echo=FALSE, message = FALSE, cache=TRUE}
@@ -282,7 +285,10 @@ remod <- clmm(y_discrete ~ age_scale*TIME + learning + I(age_scale^2) +
 ```{r retable, echo=FALSE, message = FALSE}
 sre <- summary(remod)$coefficients 
 sre %>% as.data.frame %>%
-  mutate(var = c("$\\alpha_1$", "$\\alpha_2$", "age$_{scale}$", "TIME",
+  mutate(Estimate = ifelse(str_detect(rownames(sre), "Normal"),
+                           Estimate,
+                           -1*Estimate), #to make them comparable to the gee coefficients
+         var = c("$\\alpha_1$", "$\\alpha_2$", "age$_{scale}$", "TIME",
                  "learning", "age$^2_{scale}$", "age$_{scale}$*TIME"),
          estimate = sprintf("%.2f %s", Estimate, stars.pval(`Pr(>|z|)`)),
          odds = round(exp(Estimate),2)) %>%
@@ -297,7 +303,7 @@ sre %>% as.data.frame %>%
 
 The random intercept has a variance (standard deviation) of `r round(remod$ST$id_integer[1]^2,2)` (`r round(remod$ST$id_integer[1],2)`).
 
-To infer the marginal evolution of hearing loss over time, one cannot simply set the random intercept equal to zero to calculate the prediction. This is because the expectation of a logit function is not equal to the logit of the expectation. Figure \@ref(fig:REpredictions) shows the evolutions for the average subjects of a certain age (where $b_i=0$) to the marginal evolutions (integrated GLMM). The latter are used to get marginal predictions for each of the ordinal levels in Figure \@ref(fig:REmarginalpredictions). This figure clearly shows the learning effect at $TIME==0$. The youngest subject have the highest probability of having excellent hearing and that probability goes down as time progresses. For older subjects, there seems to be a tipping point where the probability of having normal hearing starts to go down, as the probability of having hearing loss steeply increases. 
+To infer the marginal evolution of hearing loss over time, one cannot simply set the random intercept equal to zero to calculate the prediction. This is because the expectation of a logit function is not equal to the logit of the expectation. Figure \@ref(fig:REpredictions) shows the evolutions for the average subjects of a certain age (where $b_i=0$) to the marginal evolutions (integrated GLMM). The latter are used to get marginal predictions for each of the ordinal levels in Figure \@ref(fig:REmarginalpredictions). This figure clearly shows the learning effect at $TIME==0$. The youngest subjects have the highest probability of having excellent hearing and that probability goes down as time progresses. For older subjects, there seems to be a tipping point where the probability of having normal hearing starts to go down, as the probability of having hearing loss steeply increases. 
 
 ```{r REpredictions, echo=FALSE, message = FALSE, fig.width = 6, fig.height = 4, fig.cap = "Marginal predictions versus the evolutions for the average subjects"}
 agecat <- c(20,30,40,50,60,70)
@@ -429,8 +435,8 @@ outliers <- data %>% left_join(ranef) %>%
   ungroup()
 ```
 
-Apart from the marginal evolution, we can also get empirical bayes estimates for all subjects.  Figure \@ref(fig:EBestimates) shows the distribution of the random intercept on the left and the scatterplot on the right shows how the random intercepts related to the subject's age and follow-up time. 
-It can be seen that there are more outliers on the right, meaning that these subjects have higher than expected hearing threshold i.e. a higher than expected probability of hearing loss. There are `r nrow(outliers)` subjects with EB estimate > 5. `r sum(outliers$maxfollowup>10)` of these subjects were followed up more than 10 years and they range from age `r min(outliers$age)` to `r max(outliers$age)`. In the current dataset, no clear reason can be find as to why these subjects deviate so much from expectation. It would be interesting to try to link the EB estimates to other characteristics that might influence hearing such as occupation for example.
+Apart from the marginal evolution, we can also get empirical bayes estimates for all subjects.  Figure \@ref(fig:EBestimates) shows the distribution of the random intercept on the left and the scatterplot on the right shows how the random intercepts are related to the subject's age and follow-up time. 
+It can be seen that there are some outliers with high random intercepts, meaning that these subjects have higher than expected hearing threshold i.e. a higher than expected probability of hearing loss. There are `r nrow(outliers)` subjects with EB estimate > 5. `r sum(outliers$maxfollowup>10)` of these subjects were followed up more than 10 years and they range from age `r min(outliers$age)` to `r max(outliers$age)`. In the current dataset, no clear reason can be find as to why these subjects deviate so much from expectation. It would be interesting to try to link the EB estimates to other characteristics that might influence hearing such as occupation for example.
 
 Figure \@ref(fig:EBestimates-individuals) shows the individually predicted evolution for a subset of subjects that have an age that is at most 1 year older or younger than the shown marginal evolutions. 
 
@@ -494,30 +500,36 @@ data %>%
   scale_color_manual(values = c("green","red","blue"))+
   theme_bw()
 ```
-As is evident from figures 3 and 5, the results of this analysis confirm the formal results from the previous section.  These results being that the observed probability of maintaining excellent hearing decreases over time and by extension the probability of developing hearing loss increases over time. Additionally, different age groups have varying baseline hearing capacities; with baseline hearing thresholds decreasing sharply as they age. As was the case in the previous assignment, the learning effect appears to artificially deflate the patients' observed hearing capabilities for their first record; lowering their probability of having excellent hearing and thus inflating their probability of having normal/reduced hearing. These results are then supported by figure 6 which details the calculated relation between Age, Time, and an individual patient's probability of having a given level of hearing capacity according to the CLMM model. This plot clearly shows various hearing evolutions clustered according to the patients respective age and length of participation.
 
-Figure 4 details the empirically measured distribution of the calculated random effects. From these figures we observe that the empirical distribution of random effects agrees with the assumption of well formed normality; lacking excessive skew or kurtosis. Additionally, the figures also show that the random intercept is largely independent of both starting age and time spent in the study. Confirming results from the previous section, these findings show that starting age and time based effects would be best fit as fixed effects.
+As is evident from figures \@ref(fig:REmarginalpredictions) and \@ref(fig:MixedModels-indiv-pred), the results of this analysis confirm the formal results from the previous section: the probability of maintaining excellent hearing decreases over time and by extension the probability of developing hearing loss increases over time. Additionally, different age groups have varying baseline hearing capacities; with baseline hearing thresholds decreasing sharply as they age. As was the case in the previous assignment, the learning effect appears to artificially deflate the patients' observed hearing capabilities for their first record; lowering their probability of having excellent hearing and thus inflating their probability of having normal/reduced hearing. These results are then supported by figure \@ref(fig:MixedModels-indiv-pred) which details the calculated relation between Age, Time, and an individual patient's probability of having a given level of hearing capacity according to the CLMM model. This plot clearly shows various hearing evolutions clustered according to the patients respective age and length of participation.
+
+Figure \@ref(fig:EBestimates) details the empirically measured distribution of the calculated random effects. From these figures, we observe that the empirical distribution of random effects agrees with the assumption of well formed normality; lacking excessive skew or kurtosis. Additionally, the figures also show that the random intercept is largely independent of both starting age and time spent in the study. Confirming results from the previous section, these findings show that starting age and time based effects would be best fit as fixed effects.
 
 
 ## Transition model
+Finally, we consider transition models. Transition models represent a natural way model categorical data, while both marginal and mixed effects model do so in a circumspect way.  Transition models are a special case of conditional models where a measurement $Y_{ij}$ in a longitudinal sequence is considered as a function of previous outcomes or history $h_{ij} = (Y_{i1},Y_{i2},....,Y_{i,j-1})$. In transition models, we consider the longitudinal data as a stochastic process with the appropriate Markov assumption, and from there we can use standard likelihood methodology to characterize the transition probabilities. Transition models in non-gaussian case can be given as:
 
-In the next step we analyse the data using an empirical Bayes approach and the coefficients from the CLMM model
-Finally, we consider transition models. Transition models represent a natural way model categorical data, while both marginal and mixed effects model do so in a circumspect way. In transition models we consider the longitudinal data as a stochastic process with the appropriate Markov assumption, and from there we can use standard likelihood methodology to characterize the transition probabilities. Variates can be accommodated using (e.g.) a (multinomial-)logistic regression
+\[Y_{ij} = \mu_{ij}^c + \epsilon_{ij}^c\]
+
+where $\mu_{ij}^c$ is the conditional mean given by $E(Y_{ij}/h_{ij})$ and $\epsilon_{ij}$ is the noise or the stochastic component.
+This is actually formulated as a Generalized Linear Model conditional on the previous outcomes and their parameters can be estimated using maximum likelihood and where joint likelihood is formed from the conditionals $Y_{ij}/h_{ij}$. Since the outcome is conditioned in the past, by chain rule the outcomes will be independent which helps to simplify the likelihood. Considering our case, transition models will be extremely useful when our interest is to see what will happen to the categorical responses from one moment to another. Since the main research questions are related to the long-term evolution of hearing thresholds and not predicting the next measurement based on the current one, transition models are likely not ideal conceptually.
+
+Technically, there are also some hurdles if we were to implement a transition model. They require a balanced dataset (with equal amount of measurements for each subject) for accurate analysis. The dataset we are dealing with is unbalanced. One would needs to be balance with other techniques such as multiple imputation. Another issue we face while trying to use transition models on our data is the irregular spacing of the measurements [@de2017discrete].
 
 
 # Discussion
 
-In this assignment we have analyzed the hearing data using a Generalized Estimating Equations approach with marginal log odds and a Cumulative Link Model with mixed effects. Then we have conducted a confirmatory analysis using an empirical Bayes methodology. Finally, we discussed the viability of transition models.  
-First, we had to trichonometrize the hearing data in order for it to be treated as an ordinal multinomial variable. We have selected our cut off points based expert evaluation and the existing medical literature used to diagnose hearing loss and have decided on the following values. If the hearing threshold is less than or equal to 6dB then the subject is classified as having *Excellent* hearing, if the threshold is between 6dB and 25dB then they are classified as having *Normal* hearing and if the threshold is more than 25 dB they are classified as having *hearing loss*. The majority of the subjects in dataset are healthy and only around 6% of all observations have hearing loss.
+In this assignment we have analyzed the hearing data using a Generalized Estimating Equations approach with marginal log odds and a Cumulative Link Model with mixed effects. Then, we have conducted a confirmatory analysis using an empirical Bayes methodology. Finally, we discussed the viability of transition models.  
+First, we had to trichotomize the hearing data in order for it to be treated as an ordinal multinomial variable. We have selected our cut off points based expert evaluation and the existing medical literature used to diagnose hearing loss and have decided on the following values. If the hearing threshold is less than or equal to 6dB then the subject is classified as having *Excellent* hearing, if the threshold is between 6dB and 25dB then they are classified as having *Normal* hearing and if the threshold is more than 25 dB they are classified as having *hearing loss*. The majority of the subjects in dataset are healthy and only around 6% of all observations have hearing loss.
 
- 	In the next step of the analysis we evaluated the data using a Generalized Estimating Equations approach. There we see that the main drivers of hearing loss are the actual persons age, with a small additional learning effect from the first time they take the evaluation. We observe that as people age they are more likely to transition from having excellent hearing to having normal hearing, while the probability of hearing loss becomes tangible only after the age of 50. The learning effect constitutes a slight increase in probability of the subjects to be classified into a lower category if it is their first time being measured.
+In the next step of the analysis, we evaluated the data using a Generalized Estimating Equations approach. The main drivers of hearing loss are the subjects' age, with a small additional learning effect from the first time they take the evaluation. We observe that, as people age, they are more likely to transition from having excellent hearing to having normal hearing, while the probability of hearing loss becomes tangible only above the age of 50. The learning effect constitutes a slight increase in probability of the subjects to be classified into a lower category if it is their first time being measured.
  	
 We also conduct a Cumulative Link Model with mixed effects. This type of model has the advantage that it can be considered in a sense as continuous model where the different ordinal categories are cut of points of a latent continuous variable. Model convergence sometimes becomes an issue with these models. That is a logit-link model with random effects will create a mixed likelihood that combines the Normal distribution of the random effect with the Logistic distribution assumed for the latent responses. We end up with conditional probabilities for each subject, and come to the same conclusion as before, that is younger people are more likely to have Excellent hearing, with the probability of having Normal hearing increasing as they get older, and the probability of hearing loss becoming tangible after 50 years of age.
 
 
 As expected, the marginal model and the mixed effects model gave similar results in terms of how the covariates influence hearing loss. It is clear that the two models show difference in the scale of their coefficients, i.e. the marginal probability coming from the GEE model and the conditional probability coming from the CLMM model. These differences arise from the fact that the mean of a nonlinear function of a random variable does not equal the nonlinear function of the mean. When we compare the subject specific curves to the population averaged curves it is clear that the slopes of the former are steeper than those of the latter. This characterizes further that the CLMM model results describe changes in the odds for an individual from the population, while the GEE model describes the population odds.
 
-It is important to note that there is a difference between the interpretation of the marginal and mixed effects models. The marginal model is more useful when we are interested in results pertaining to the entire population, while mixed models are more suited to answering question regarding an individual in said population. The choice of model will therefore be motivated by the research question.
+It is important to note that there is a difference between the interpretation of the marginal and mixed effects models. The marginal model is more useful when we are interested in results pertaining to the entire population, while mixed models are more suited to answering question regarding an individual in said population. The choice of model should therefore be motivated by the research question.
 	
 
 
