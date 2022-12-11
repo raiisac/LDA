@@ -142,7 +142,7 @@ $$\log \theta_{tjt'j'} =
 \phi & \phi & \phi & \phi & \cdots &  0 & 0
 \end{pmatrix}$$
 
-Where the matrix is dimensions of the per subject observations and the 4 zero block on the diagonal comes up because at each time step we have both a left and a right ear. The side of the ear comes up non-significant. \newline
+Where the matrix is square with size equivalent to the number of patient trials; 2x2 blocks of zeros populate the diagonal to represent measurements between each patient's ear for each time period. The side of the ear comes up non-significant. \newline
 The next step is model selection which we do with the help of Wald test. We conducted a greedy model selection (both forward by starting with a minimal model and adding variables, and backwards by starting with a full model and removing variables) which fortunately converged. The resulting model was the same as in the model in the previous assignment (model specifications in equation \@ref(eq:Ordinal)). 
 
 \begin{equation}
