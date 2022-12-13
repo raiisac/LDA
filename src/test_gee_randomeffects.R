@@ -5,7 +5,8 @@ trichotomization <- c(-100, 6, 25, 120)
 data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
                                 criterion = has_file("LDA.Rproj"))) %>%
   mutate(side = as.factor(side),
-         side_integer =as.integer(side),
+         side_integer = as.integer(side),
+         TIME_scale = unname(scale(TIME, center = TRUE, scale = TRUE)),
          id = as.factor(id),
          id_integer = as.integer(id),
          age_measurement = age + TIME,
@@ -27,19 +28,19 @@ geemod <- ordgee(y_discrete ~ age*TIME + learning + I(age^2),
                  data = data, id = id,
                  int.const = TRUE,
                  mean.link = "logit",
-                 corstr = "unstructured"
+                 corstr = "independence" #only works with independence
                  )
 summary(geemod)
 #---------------------------Random effects models------------------------------#
 library(ordinal)
-remod <- clmm(as.factor(y_integer) ~ age*TIME + learning + I(age^2) +
-               (1 |id_integer), #doesn't work with random slopes
+remod <- clmm2(y_discrete ~ age_scale*TIME + learning + I(age_scale^2) +
+               (1|id_integer), #doesn't work with random slopes
              data = data)
 summary(remod)
 agecat <- c(20,30,40,50,60,70)
 nDF <- expand.grid(age = agecat,
                    TIME = seq(0, 22, length.out = 60)) %>%
-  mutate(learning = (TIME == 1),
+  mutate(learning = (TIME == 0),
          `I(age^2)` = age^2,
          `age:TIME` = age*TIME)
 
@@ -52,7 +53,7 @@ predictions <- fake.predict.clmm(remod, newdata = nDF)
 
 
 library(MPDiR)
-polmer(y_discrete ~ age*TIME + learning + I(age^2) +
+mm <- polmer(y_discrete ~ age*TIME + learning + I(age^2) +
          (1 |id),
        data = data)
 
