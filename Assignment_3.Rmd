@@ -1,0 +1,124 @@
+---
+documentclass: article
+fontsize: 12pt
+date: "`r Sys.Date()`"
+output: 
+  bookdown::pdf_document2: 
+    toc: false
+    latex_engine: xelatex
+    fig_caption: yes
+    includes:
+      in_header: preamble.sty
+      before_body: titlepage.sty
+bibliography: references.bib  
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(haven) # to read SAS files
+library(kableExtra)
+library(qwraps2)
+library(rprojroot)
+library(patchwork)
+library(psych)
+library(gtools)
+library(ordinal)
+library(visdat)#visualize missingness
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load, include=FALSE, message=FALSE, warning=FALSE}
+trichotomization <- c(-100, 6, 25, 120)
+data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
+                                criterion = has_file("LDA.Rproj"))) %>%
+  mutate(side = as.factor(side),
+         side_integer = as.integer(side),
+         TIME_discrete = round(TIME),
+         id = as.factor(id),
+         id_integer = as.integer(id),
+         age_measurement = age + TIME,
+         age_scale = unname(scale(age, center = TRUE, scale = TRUE)),
+         age_discrete = cut(age,
+                            breaks = c(0,30,50,70,100),
+                            labels = c("<30", "30-50", "50-70",">70")),
+         y_discrete = factor(as.factor(cut(y,
+                          breaks = trichotomization,
+                          labels = c("Excellent", "Normal", "Hearing loss"))),
+                          levels = c("Excellent", "Normal", "Hearing loss"),
+                          ordered = TRUE),
+         y_integer = as.integer(y_discrete),
+         learning = 1*(TIME == 0)) %>%
+  arrange(id)
+subject_characteristics <- data %>%
+  group_by(id) %>%
+  summarize(age = first(age),
+            age_scale = first(age_scale),
+            age_discrete = first(age_discrete),
+            id_integer = first(id_integer)) %>%
+  ungroup()
+  
+data_grid <- expand.grid(id = unique(data$id),
+                         TIME_discrete = 0:max(data$TIME_discrete),
+                         side = unique(data$side)) %>%
+  left_join(data%>%dplyr::select(-age, -age_scale, -age_discrete, -id_integer)) %>%
+  mutate(R = is.na(y), # R denotes missingness
+         learning = (TIME_discrete == 0)) %>%
+  left_join(subject_characteristics, by = c("id" = "id")) #add the subject characteristics back in)
+```
+
+# Introduction
+First, the *TIME* variable is rounded to the nearest integer value. Should we keep only one measurement per time instance (eg, take the average?). Hearing thresholds will be explored, both as a continuous variable and as a trichotomized (ordinal) variable with the following three levels:
+
+- $\leq$ 6 dB: Excellent hearing
+- over 6 and $\leq$ 25 dB: Normal hearing
+- $\geq$ 26 dB: Hearing loss
+
+## Missingness exploration
+```{r Missingnessprep, include=FALSE, message=FALSE, warning=FALSE}
+data_by_id_time <- data_grid %>% 
+  group_by(id, TIME_discrete) %>%
+  summarize(n = sum(!is.na(y_discrete))) %>%
+  ungroup()
+```
+After discretizing the *TIME* variable, we consider a subject to be missing at a certain time instance if there is no measurement for that subject at that time. It should be noted that, if the subject is not missing (`r round((1-sum(data_by_id_time$n==0)/nrow(data_by_id_time))*100,2)`% of TIME-subject instances), we usually (`r round((sum(data_by_id_time$n==2)/nrow(data_by_id_time))*100,2)` have at two measurements (one for each ear) at each time instance. In fact, the average number of measurements per subject at each time instance is `r round(mean(data_by_id_time$n),2)`, and maximum `r round(max(data_by_id_time$n),2)`. 
+
+The following graph was created using the *visdat* package. It shows all subjects, ordered from youngest (in the top) to oldest (in the bottom) and whether or not their data is missing at a certain time instance (on the x-axis). The percentages on top shows the percentage missingness at each time instance.
+
+```{r Missingness-visdat, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Visual inspection of missingness for different ages at different time instances.", fig.height = 9, fig.width=7}
+data_grid %>%
+  mutate(TIME_discrete = factor(as.factor(TIME_discrete), ordered = TRUE)) %>%
+  group_by(id, TIME_discrete) %>%
+  summarize(missing = ifelse(any(!is.na(y)),TRUE, NA),
+        age = first(age)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = TIME_discrete, values_from = missing) %>% 
+  arrange(age) %>%
+  dplyr::select(3:(3 + max(data_grid$TIME_discrete))) %>%
+  vis_miss() + ylab("id sorted by age") +
+  theme(plot.margin = margin(0,1,0,0, "cm")) 
+```
+
+# Methodology
+
+First, a direct likelihood analysis is compared with multiple imputation in the ?? continuous/discrete??? case. 
+Next, weighted generalized estimating equations are compared with ‘multiple-imputation generalized estimating equations’. 
+Lastly, a sensitivity analysis is performed
+
+All analysis was done in R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA). 
+
+# Results
+
+## Direct likelihood analysis versus multiple imputation
+
+Q4
+
+## Weighted generalized estimating equations versus ‘multiple-imputation generalized estimating equations’
+
+Q5
+
+## Sensitivity analysis
+
+Q6
+
+# Bibliography
+
