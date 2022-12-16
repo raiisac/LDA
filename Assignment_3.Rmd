@@ -67,7 +67,8 @@ data_grid <- expand.grid(id = unique(data$id),
 ```
 
 # Introduction
-First, the *TIME* variable is rounded to the nearest integer value. Should we keep only one measurement per time instance (eg, take the average?). Hearing thresholds will be explored, both as a continuous variable and as a trichotomized (ordinal) variable with the following three levels:
+
+First, the *TIME* variable is rounded to the nearest integer value. Hearing thresholds will be explored, both as a continuous variable and as a trichotomized (ordinal) variable with the following three levels:
 
 - $\leq$ 6 dB: Excellent hearing
 - over 6 and $\leq$ 25 dB: Normal hearing
@@ -80,11 +81,20 @@ data_by_id_time <- data_grid %>%
   summarize(n = sum(!is.na(y_discrete))) %>%
   ungroup()
 ```
-After discretizing the *TIME* variable, we consider a subject to be missing at a certain time instance if there is no measurement for that subject at that time. It should be noted that, if the subject is not missing (`r round((1-sum(data_by_id_time$n==0)/nrow(data_by_id_time))*100,2)`% of TIME-subject instances), we usually (`r round((sum(data_by_id_time$n==2)/nrow(data_by_id_time))*100,2)` have at two measurements (one for each ear) at each time instance. In fact, the average number of measurements per subject at each time instance is `r round(mean(data_by_id_time$n),2)`, and maximum `r round(max(data_by_id_time$n),2)`. 
 
-The following graph was created using the *visdat* package. It shows all subjects, ordered from youngest (in the top) to oldest (in the bottom) and whether or not their data is missing at a certain time instance (on the x-axis). The percentages on top shows the percentage missingness at each time instance.
+After discretizing the *TIME* variable, we consider a subject to be missing at a certain time instance if there is no measurement for that subject at that time. It should be noted that, if the subject is not missing (`r round((1-sum(data_by_id_time$n==0)/nrow(data_by_id_time))*100,2)`% of TIME-subject instances), we usually (`r round((sum(data_by_id_time$n==2)/nrow(data_by_id_time))*100,2)`% of TIME-subject instances) have two measurements (one for each ear) at each time instance. In fact, the average number of measurements per subject at each time instance is `r round(mean(data_by_id_time$n),2)`, and maximum `r round(max(data_by_id_time$n),2)`. 
 
-```{r Missingness-visdat, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Visual inspection of missingness for different ages at different time instances.", fig.height = 9, fig.width=7}
+Figure \@ref(fig:Missingness) was created using the *visdat* package. It shows all subjects, ordered from youngest (in the top) to oldest (in the bottom) and whether or not their data is missing at a certain time instance (on the x-axis). The percentages on top shows the percentage of missingness at each time instance. It is clear from Figure \@ref(fig:Missingness-visdat) that the missingness is not monotone; subjects may be missing at one time instance and come back later. Since there are many possible missingness patterns with 23 time instances (), we do not give an overview of the number of subjects that follow each possible pattern. Instead, figure \@ref(fig:missingtessovertime) shows, for each time instance, the number of subjects that:
+
+- are *present*: when the subject's hearing is measured at time $t$ and $t-1$
+- are *missing*: when the subject is missing at time $t$ and $t-1$
+- *drop out*: when the subject's hearing is measured at time $t-1$ but not at time$t$
+- *return*: when the subject's hearing is measured at time $t$ but not at time $t-1$
+
+Figure \@ref(fig:missingtessovertime) clearly shows that subject rarely are measured two years in a row, most are not measured at $t=1$, and the number of subjects that stay missing gradually increases as time passes.
+
+ 
+```{r Missingness, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Visual inspection of missingness for different ages at different time instances.", fig.height = 9, fig.width=7}
 data_grid %>%
   mutate(TIME_discrete = factor(as.factor(TIME_discrete), ordered = TRUE)) %>%
   group_by(id, TIME_discrete) %>%
@@ -96,6 +106,39 @@ data_grid %>%
   dplyr::select(3:(3 + max(data_grid$TIME_discrete))) %>%
   vis_miss() + ylab("id sorted by age") +
   theme(plot.margin = margin(0,1,0,0, "cm")) 
+```
+
+```{r missingtessovertime, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Number of subjects the are present, return, drop out or are missing at each time instance.", fig.height = 4, fig.width=6}
+categorize <- function(x){
+  cat <- rep(NA, length(x))
+  cat[1] <- ifelse(x[1], "missing", "present")
+  if(length(x) > 1){
+    l <- lag(x)
+    cat[-1] <- ifelse(l[-1],
+                      ifelse(x[-1],
+                             "missing",
+                             "return"),
+                      ifelse(x[-1],
+                             "drop out",
+                             "present"))
+  }
+  return(cat)
+}
+
+data_grid %>%
+  group_by(id, TIME_discrete) %>%
+  summarize(R = any(R)) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(missing = factor(as.factor(categorize(R)), ordered = TRUE,
+                          levels = c("present", "return", 
+                          "drop out", "missing"))) %>%
+  ungroup() %>%
+  ggplot() +
+  geom_bar(aes(x=TIME_discrete, fill = missing)) +
+  scale_fill_discrete(name = "") +
+  ylab("Number of subjects") + xlab("TIME") +
+  theme_bw()
 ```
 
 # Methodology
