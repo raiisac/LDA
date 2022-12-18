@@ -76,6 +76,7 @@ First, the *TIME* variable is rounded to the nearest integer value. Hearing thre
 
 ## Missingness exploration
 ```{r Missingnessprep, include=FALSE, message=FALSE, warning=FALSE}
+
 data_by_id_time <- data_grid %>% 
   group_by(id, TIME_discrete) %>%
   summarize(n = sum(!is.na(y_discrete))) %>%
@@ -84,7 +85,7 @@ data_by_id_time <- data_grid %>%
 
 After discretizing the *TIME* variable, we consider a subject to be missing at a certain time instance if there is no measurement for that subject at that time. It should be noted that, if the subject is not missing (`r round((1-sum(data_by_id_time$n==0)/nrow(data_by_id_time))*100,2)`% of TIME-subject instances), we usually (`r round((sum(data_by_id_time$n==2)/nrow(data_by_id_time))*100,2)`% of TIME-subject instances) have two measurements (one for each ear) at each time instance. In fact, the average number of measurements per subject at each time instance is `r round(mean(data_by_id_time$n),2)`, and maximum `r round(max(data_by_id_time$n),2)`. 
 
-Figure \@ref(fig:Missingness) was created using the *visdat* package. It shows all subjects, ordered from youngest (in the top) to oldest (in the bottom) and whether or not their data is missing at a certain time instance (on the x-axis). The percentages on top shows the percentage of missingness at each time instance. It is clear from Figure \@ref(fig:Missingness-visdat) that the missingness is not monotone; subjects may be missing at one time instance and come back later. Since there are many possible missingness patterns with 23 time instances (), we do not give an overview of the number of subjects that follow each possible pattern. Instead, figure \@ref(fig:missingtessovertime) shows, for each time instance, the number of subjects that:
+Figure \@ref(fig:Missingness) was created using the *visdat* package. It shows all subjects, ordered from youngest (in the top) to oldest (in the bottom) and whether or not their data is missing at a certain time instance (on the x-axis). The percentages on top shows the percentage of missingness at each time instance. It is clear from Figure \@ref(fig:Missingness-visdat) that the missingness is not monotone; subjects may be missing at one time instance and come back later. Since there are too many possible missingness patterns with 23 time instances ($2^{23}$), we do not give an overview of the number of subjects that follow each possible pattern. Instead, figure \@ref(fig:missingtessovertime) shows, for each time instance, the number of subjects that:
 
 - are *present*: when the subject's hearing is measured at time $t$ and $t-1$
 - are *missing*: when the subject is missing at time $t$ and $t-1$
@@ -140,6 +141,42 @@ data_grid %>%
   ylab("Number of subjects") + xlab("TIME") +
   theme_bw()
 ```
+
+Lastly we explore whether the missingness can be explained by the data by fitting a mixed model to a dataset where $R_it$ is equal to one if the hearing threshold is missing and zero otherwise:
+
+\begin{equation}
+\left\{
+                \begin{array}{ll}
+                logit(R_{it}) = \beta_0 + \beta_1 TIME_{it} + \beta_3 side_{it} + \beta_4 age_{it} + b_i \\
+                b_i \sim N(0,\sigma^2)
+                \end{array}
+          \right.
+(\#eq:missingness)
+\end{equation}
+
+The variable *age* was standardized to get convergence in the model. Table \@ref(tab:missing_mixedmodel) shows that the only truely significant variable is TIME; as time increases, subjects are more likely to be missing. We can therefore assume missingness at random (MAR).
+
+```{r missing_mixedmodel, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+library(lme4)
+data_grid <- data_grid %>%mutate(
+  R_num = 1*(R==TRUE),
+  age_scale = scale(age, center = TRUE, scale = TRUE)
+)
+m1 <- glmer(formula = R_num ~ TIME_discrete  + side + age_scale + (1|id),
+        data = data_grid,
+        family=binomial(link = "logit"))
+s <- summary(m1) 
+s$coefficients %>% as.data.frame() %>%
+  mutate(var = c('Intercept', "TIME", "sideright","age"),
+         result = sprintf("%.2f %s", Estimate, stars.pval(`Pr(>|z|)`))) %>%
+  dplyr::select(var, result) %>%
+  rbind(c("sigma", round(unname(attr(s$varcor$id, "stddev"))^2,2))) %>%
+  kable(booktabs = TRUE,
+        caption = "A mixed model to predict missingness",
+        col.names = c('Variable', 'Estimate')) %>%
+  kable_styling()
+```
+
 
 # Methodology
 
