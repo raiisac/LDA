@@ -1,0 +1,57 @@
+---
+title: "Untitled"
+author: "Kendall Brown r0773111"
+date: "12/20/2022"
+output: html_document
+---
+
+
+Grouping by id causes a lot of issues need to discuss
+```{r}
+#direct lh (lavaan FIML)
+#data_grid$age_measurement=data_grid$age+data_grid$TIME_discrete
+
+
+library(lavaan)
+
+fit.dlh.cont=sem('y~age+TIME+learning',data=data_grid,missing="direct",fixed.x=FALSE)
+summary(fit.dlh.cont)
+```
+
+```{r}
+#MI
+data_grid_cutdown=data_grid%>%transmute(id,y,TIME_discrete,age,learning)
+
+library(mice)
+data_grid_mice_norm=complete(mice(data_grid_cutdown,method = "norm"))
+
+data_grid_mice_pmm=complete(mice(data_grid_cutdown,method = "pmm"))
+
+data_grid_mice_mean=complete(mice(data_grid_cutdown,method = "mean"))
+
+data_grid_mice_rf=complete(mice(data_grid_cutdown,method = "rf"))
+```
+
+```{r}
+library(nlme)
+
+lmeControl(maxIter = 1000)
+
+#fit.mi.norm.cont.simp=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_norm,random = ~1+TIME_discrete|id)
+
+fit.mi.pmm.cont.simp=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_pmm,random = ~1+TIME_discrete|id)
+
+fit.mi.mean.cont.simp=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_mean,random = ~1+TIME_discrete|id)
+
+#fit.mi.rf.cont.simp=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_rf,random = ~1+TIME_discrete|id)
+```
+
+```{r}
+#fit.mi.norm.cont.compsymm=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_norm,random = ~1+TIME_discrete|id,cor = nlme::corCompSymm())
+
+fit.mi.pmm.cont.compsymm=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_pmm,random = ~1+TIME_discrete|id,cor = nlme::corCompSymm())
+
+fit.mi.mean.cont.compsymm=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_mean,random = ~1+TIME_discrete|id,cor = nlme::corCompSymm())
+
+#fit.mi.rf.cont.compsymm=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_rf,random = ~1+TIME_discrete|id,cor = nlme::corCompSymm())
+```
