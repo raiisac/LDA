@@ -68,7 +68,11 @@ data_grid <- expand.grid(id = unique(data$id),
 
 # Introduction
 
-First, the *TIME* variable is rounded to the nearest integer value. Hearing thresholds will be explored, both as a continuous variable and as a trichotomized (ordinal) variable with the following three levels:
+This report assesses the evolution of hearing thresholds over time for a sample of `r nlevels(data$id)` healthy male volunteers. The data originates from the famous Baltimore Longitudinal Study of Aging (BLSA). Previous research showed a change in hearing threshold for all age groups but especially the older population [@doi:10.1121/1.399731]. In this report, we will especially take care of missingness in the data.
+
+First, the *TIME* variable is rounded to the nearest integer value. As such, we aim to balance the dataset with equally-spaced time instances when hearing thresholds are measured. 
+
+Hearing thresholds will be explored, both as a continuous variable and as a trichotomized (ordinal) variable with the following three levels:
 
 - $\leq$ 6 dB: Excellent hearing
 - over 6 and $\leq$ 25 dB: Normal hearing
@@ -85,14 +89,14 @@ data_by_id_time <- data_grid %>%
 
 After discretizing the *TIME* variable, we consider a subject to be missing at a certain time instance if there is no measurement for that subject at that time. It should be noted that, if the subject is not missing (`r round((1-sum(data_by_id_time$n==0)/nrow(data_by_id_time))*100,2)`% of TIME-subject instances), we usually (`r round((sum(data_by_id_time$n==2)/nrow(data_by_id_time))*100,2)`% of TIME-subject instances) have two measurements (one for each ear) at each time instance. In fact, the average number of measurements per subject at each time instance is `r round(mean(data_by_id_time$n),2)`, and maximum `r round(max(data_by_id_time$n),2)`. 
 
-Figure \@ref(fig:Missingness) was created using the *visdat* package. It shows all subjects, ordered from youngest (in the top) to oldest (in the bottom) and whether or not their data is missing at a certain time instance (on the x-axis). The percentages on top shows the percentage of missingness at each time instance. It is clear from Figure \@ref(fig:Missingness-visdat) that the missingness is not monotone; subjects may be missing at one time instance and come back later. Since there are too many possible missingness patterns with 23 time instances ($2^{23}$), we do not give an overview of the number of subjects that follow each possible pattern. Instead, figure \@ref(fig:missingtessovertime) shows, for each time instance, the number of subjects that:
+Figure \@ref(fig:Missingness) was created using the *visdat* package. It shows all subjects, ordered from youngest (in the top) to oldest (in the bottom) and whether or not their data is missing at a certain time instance (on the x-axis). The percentages on top shows the percentage of missingness at each time instance. It is clear from Figure \@ref(fig:Missingness) that the missingness is not monotone; subjects may be missing at one time instance and come back later. Since there are too many possible missingness patterns with 23 time instances ($2^{23}$), we do not give an overview of the number of subjects that follow each possible pattern. Instead, figure \@ref(fig:missingnessovertime) shows, for each time instance, the number of subjects that:
 
 - are *present*: when the subject's hearing is measured at time $t$ and $t-1$
 - are *missing*: when the subject is missing at time $t$ and $t-1$
 - *drop out*: when the subject's hearing is measured at time $t-1$ but not at time$t$
 - *return*: when the subject's hearing is measured at time $t$ but not at time $t-1$
 
-Figure \@ref(fig:missingtessovertime) clearly shows that subject rarely are measured two years in a row, most are not measured at $t=1$, and the number of subjects that stay missing gradually increases as time passes.
+Figure \@ref(fig:missingnessovertime) clearly shows that subject rarely are measured two years in a row, most are not measured at $t=1$, and the number of subjects that stay missing gradually increases as time passes.
 
  
 ```{r Missingness, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Visual inspection of missingness for different ages at different time instances.", fig.height = 9, fig.width=7}
@@ -109,7 +113,7 @@ data_grid %>%
   theme(plot.margin = margin(0,1,0,0, "cm")) 
 ```
 
-```{r missingtessovertime, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Number of subjects the are present, return, drop out or are missing at each time instance.", fig.height = 4, fig.width=6}
+```{r missingnessovertime, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Number of subjects the are present, return, drop out or are missing at each time instance.", fig.height = 4, fig.width=6}
 categorize <- function(x){
   cat <- rep(NA, length(x))
   cat[1] <- ifelse(x[1], "missing", "present")
@@ -154,11 +158,11 @@ Lastly we explore whether the missingness can be explained by the data by fittin
 (\#eq:missingness)
 \end{equation}
 
-The variable *age* was standardized to get convergence in the model. Table \@ref(tab:missing_mixedmodel) shows that the only truely significant variable is TIME; as time increases, subjects are more likely to be missing. We can therefore assume missingness at random (MAR).
+The variable *age* was standardized to get convergence in the model. Table \@ref(tab:missingmixedmodel) shows that the only truly significant variable is TIME; as time increases, subjects are more likely to be missing. We can therefore assume missingness at random (MAR).
 
-```{r missing_mixedmodel, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+```{r missingmixedmodel, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, eval=TRUE}
 library(lme4)
-data_grid <- data_grid %>%mutate(
+data_grid <- data_grid %>% mutate(
   R_num = 1*(R==TRUE),
   age_scale = scale(age, center = TRUE, scale = TRUE)
 )
@@ -172,8 +176,9 @@ s$coefficients %>% as.data.frame() %>%
   dplyr::select(var, result) %>%
   rbind(c("sigma", round(unname(attr(s$varcor$id, "stddev"))^2,2))) %>%
   kable(booktabs = TRUE,
-        caption = "A mixed model to predict missingness",
-        col.names = c('Variable', 'Estimate')) %>%
+        caption = "A mixed model to predict missingness.",
+        col.names = c('Variable', 'Estimate'),
+        row.names = FALSE ) %>%
   kable_styling()
 ```
 
