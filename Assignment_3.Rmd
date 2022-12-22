@@ -80,7 +80,6 @@ Hearing thresholds will be explored, both as a continuous variable and as a tric
 
 ## Missingness exploration
 ```{r Missingnessprep, include=FALSE, message=FALSE, warning=FALSE}
-
 data_by_id_time <- data_grid %>% 
   group_by(id, TIME_discrete) %>%
   summarize(n = sum(!is.na(y_discrete))) %>%
@@ -151,27 +150,29 @@ Lastly we explore whether the missingness can be explained by the data by fittin
 \begin{equation}
 \left\{
                 \begin{array}{ll}
-                logit(R_{it}) = \beta_0 + \beta_1 TIME_{it} + \beta_3 side_{it} + \beta_4 age_{it} + b_i \\
+                logit(R_{it}) = \beta_0 + \beta_1 TIME_{it} + \beta_3 side_{it} + \beta_4 age_{it} + \beta_5 R_{it-1} + b_i \\
                 b_i \sim N(0,\sigma^2)
                 \end{array}
           \right.
 (\#eq:missingness)
 \end{equation}
 
-The variable *age* was standardized to get convergence in the model. Table \@ref(tab:missingmixedmodel) shows that the only truly significant variable is TIME; as time increases, subjects are more likely to be missing. We can therefore assume missingness at random (MAR).
+The variable *age* was standardized to get convergence in the model. Table \@ref(tab:missingmixedmodel) shows that TIME is significant; as time increases, subjects are more likely to be missing. We can therefore assume missingness at random (MAR). Left ear measurements are also more likely to be missing. A subject is also less likely to be missing at time $t$ if he was missing at time $t-1$.
 
 ```{r missingmixedmodel, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, eval=TRUE}
 library(lme4)
 data_grid <- data_grid %>% mutate(
-  R_num = 1*(R==TRUE),
-  age_scale = scale(age, center = TRUE, scale = TRUE)
-)
-m1 <- glmer(formula = R_num ~ TIME_discrete  + side + age_scale + (1|id),
+  R_num = 1*(R == TRUE),
+  age_scale = scale(age, center = TRUE, scale = TRUE)) %>%
+  group_by(id) %>%
+  mutate(R_num_lag = dplyr::lag(R_num, n = 1)) %>%
+  ungroup()
+m1 <- glmer(formula = R_num ~ TIME_discrete  + side + age_scale + R_num_lag + (1|id),
         data = data_grid,
         family=binomial(link = "logit"))
 s <- summary(m1) 
 s$coefficients %>% as.data.frame() %>%
-  mutate(var = c('Intercept', "TIME", "sideright","age"),
+  mutate(var = c('Intercept', "TIME", "sideright", "age", "$R_{t-1}$"),
          result = sprintf("%.2f %s", Estimate, stars.pval(`Pr(>|z|)`))) %>%
   dplyr::select(var, result) %>%
   rbind(c("sigma", round(unname(attr(s$varcor$id, "stddev"))^2,2))) %>%
