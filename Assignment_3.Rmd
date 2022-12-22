@@ -24,6 +24,7 @@ library(psych)
 library(gtools)
 library(ordinal)
 library(visdat)#visualize missingness
+library(mice)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -157,7 +158,7 @@ Lastly we explore whether the missingness can be explained by the data by fittin
 (\#eq:missingness)
 \end{equation}
 
-The variable *age* was standardized to get convergence in the model. Table \@ref(tab:missingmixedmodel) shows that TIME is significant; as time increases, subjects are more likely to be missing. We can therefore assume missingness at random (MAR). Left ear measurements are also more likely to be missing. A subject is also less likely to be missing at time $t$ if he was missing at time $t-1$.
+The variable *age* was standardized to get convergence in the model. Table \@ref(tab:missingmixedmodel) shows that TIME is significant; as time increases, subjects are more likely to be missing. We can therefore assume missingness at random (MAR). Left ear measurements are also more likely to be missing. A subject is also less likely to be missing at time $t$ if he was missing at time $t-1$. This can be seen especially in the first couple of years in figure \@ref(fig:Missingness): all but 3 subjects are measured at $t=0$, almost no-one is measured at $t=1$ and many are measured again at $t=2$.
 
 ```{r missingmixedmodel, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, eval=TRUE}
 library(lme4)
@@ -188,7 +189,9 @@ s$coefficients %>% as.data.frame() %>%
 
 First, a direct likelihood analysis is compared with multiple imputation in the ?? continuous/discrete??? case. 
 Next, weighted generalized estimating equations are compared with ‘multiple-imputation generalized estimating equations’. 
-Lastly, a sensitivity analysis is performed
+Lastly, a sensitivity analysis is performed.
+
+For imputation, the *mice* library is used [@JSSv045i03] and different imputation techniques were tested: Predictive mean matching, Bayesian linear regression, Unconditional mean imputation, and imputation by random forests. 
 
 All analysis was done in R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA). 
 
@@ -198,8 +201,14 @@ All analysis was done in R. All scripts are freely available at [this git reposi
 
 Q4
 
-## Weighted generalized estimating equations versus ‘multiple-imputation generalized estimating equations’
+### Direct likelihood
 
+### Multiple imputation
+
+
+
+## Weighted generalized estimating equations versus ‘multiple-imputation generalized estimating equations’
+Using frequentist methods,
 Q5
 
 ## Sensitivity analysis

@@ -1,0 +1,151 @@
+---
+title: 'A3: Generate Imputations'
+author: "Raïsa Carmen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(haven) # to read SAS files
+library(kableExtra)
+library(qwraps2)
+library(rprojroot)
+library(patchwork)
+library(psych)
+library(gtools)
+library(ordinal)
+library(visdat)#visualize missingness
+library(mice)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load, include=FALSE, message=FALSE, warning=FALSE}
+trichotomization <- c(-100, 6, 25, 120)
+data <- read_sas(find_root_file("data/hearing500lr.sas7bdat",
+                                criterion = has_file("LDA.Rproj"))) %>%
+  mutate(side = as.factor(side),
+         side_integer = as.integer(side),
+         TIME_discrete = round(TIME),
+         id = as.factor(id),
+         id_integer = as.integer(id),
+         age_measurement = age + TIME,
+         age_scale = unname(scale(age, center = TRUE, scale = TRUE)),
+         age_discrete = cut(age,
+                            breaks = c(0,30,50,70,100),
+                            labels = c("<30", "30-50", "50-70",">70")),
+         y_discrete = factor(as.factor(cut(y,
+                          breaks = trichotomization,
+                          labels = c("Excellent", "Normal", "Hearing loss"))),
+                          levels = c("Excellent", "Normal", "Hearing loss"),
+                          ordered = TRUE),
+         y_integer = as.integer(y_discrete),
+         learning = 1*(TIME == 0)) %>%
+  arrange(id)
+subject_characteristics <- data %>%
+  group_by(id) %>%
+  summarize(age = first(age),
+            age_scale = first(age_scale),
+            age_discrete = first(age_discrete),
+            id_integer = first(id_integer)) %>%
+  ungroup()
+  
+data_grid <- expand.grid(id = unique(data$id),
+                         TIME_discrete = 0:max(data$TIME_discrete),
+                         side = unique(data$side)) %>%
+  left_join(data%>%dplyr::select(-age, -age_scale, -age_discrete, -id_integer)) %>%
+  mutate(R = is.na(y), # R denotes missingness
+         learning = (TIME_discrete == 0)) %>%
+  left_join(subject_characteristics, by = c("id" = "id")) #add the subject characteristics back in)
+```
+
+We generate several different imputed datasets that can be used both in question 3 and 4. For each of the datasets, we also save a version where the data is imputed only until the last measurement (to get monotone missingness) and a version with full imputation. We generate imputed data with $M=10$ but will start our analysis on only the 5 first datasets. Only if convergence is not met at $M=5$, will we use more than $M=5$.
+
+```{r, eval = !file.exists(find_root_file("data/intermediate/raw_imputation.Rdata", criterion = has_file("LDA.Rproj")))}
+#MI
+data_grid_cutdown <- data_grid %>%
+  transmute(id, y, TIME_discrete, age, learning, side)
+
+library(mice)
+data_grid_mice_norm <- mice(data_grid_cutdown,method = "norm", m = 10)
+
+data_grid_mice_pmm <- mice(data_grid_cutdown,method = "pmm", m = 10)
+
+data_grid_mice_mean <- mice(data_grid_cutdown,method = "mean", m = 10)
+
+data_grid_mice_rf <- mice(data_grid_cutdown,method = "rf", m = 10)
+
+save(data_grid_mice_norm, data_grid_mice_pmm, data_grid_mice_mean,
+     data_grid_mice_rf, 
+     file = find_root_file("data/intermediate/raw_imputation.Rdata", 
+                           criterion = has_file("LDA.Rproj")))
+```
+
+The data that was imputed with the mean method always yields the same imputed value in each iteration. This can also be seen in the trace lines (5 iterations are used). Trace line plots portray the value of an estimate against the iteration number. The estimate can be anything that you can calculate, but typically are chosen as parameter of scientific interest. The plot method for a mids object plots the mean and standard deviation of the imputed (not observed) values against the iteration number for each of the $m$ replications. By default, the function plot the development of the mean and standard deviation for each incomplete variable. On convergence, the streams should intermingle and be free of any trend.
+
+```{r, eval = file.exists(find_root_file("data/intermediate/raw_imputation.Rdata", criterion = has_file("LDA.Rproj")))}
+load(find_root_file("data/intermediate/raw_imputation.Rdata", 
+                    criterion = has_file("LDA.Rproj")))
+```
+
+```{r, fig.cap="Trace lines for norm method (Bayesian linear regression)"}
+plot(data_grid_mice_norm)
+```
+
+```{r, fig.cap="Trace lines for pmm method (Predictive mean matching)"}
+plot(data_grid_mice_pmm)
+```
+
+```{r, fig.cap="Trace lines for mean method (Unconditional mean imputation)"}
+plot(data_grid_mice_mean)
+```
+
+```{r, fig.cap="Trace lines for rf method ( Random forest imputations)"}
+plot(data_grid_mice_rf)
+```
+
+
+
+
+```{r, eval = !file.exists(find_root_file("data/imputated_data.Rdata", criterion = has_file("LDA.Rproj")))}
+lastmeasure <- data %>%
+  group_by(id) %>%
+  summarize(last = max(TIME_discrete)) %>%
+  ungroup()
+data_grid_cutdown  <- data_grid_cutdown %>%
+  left_join(lastmeasure)
+
+generate_imputeted_dataframe <- function(data_impute, mids_object){
+  for(i in 1:mids_object$m){
+    impute <- complete(mids_object, i)$y
+    data_impute[, "impfull"] <- impute
+    data_impute <- data_impute %>% 
+      mutate(monotone = ifelse(TIME_discrete > last,
+                               NA,
+                               impfull))
+    colnames(data_impute)[(ncol(data_impute)-1):ncol(data_impute)] <- 
+      c(sprintf("impfull%d", i), sprintf("impmonotone%d", i))
+  }
+  return(data_impute)
+}
+
+data_imp_norm <- generate_imputeted_dataframe(data_impute = data_grid_cutdown,
+                                              mids_object = data_grid_mice_norm)
+
+data_imp_pmm <- generate_imputeted_dataframe(data_impute = data_grid_cutdown,
+                                              mids_object = data_grid_mice_pmm)
+
+data_imp_mean <- generate_imputeted_dataframe(data_impute = data_grid_cutdown,
+                                              mids_object = data_grid_mice_mean)
+
+data_imp_rf <- generate_imputeted_dataframe(data_impute = data_grid_cutdown,
+                                              mids_object = data_grid_mice_rf)
+save(data_imp_norm, data_imp_pmm, data_imp_mean, data_imp_rf, 
+     file = find_root_file("data/imputated_data.Rdata", 
+                           criterion = has_file("LDA.Rproj")))
+```
+
+```{r, eval = file.exists(find_root_file("data/imputated_data.Rdata", criterion = has_file("LDA.Rproj")))}
+load(find_root_file("data/imputated_data.Rdata", 
+                    criterion = has_file("LDA.Rproj")))
+```
