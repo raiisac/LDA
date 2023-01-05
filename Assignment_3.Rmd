@@ -61,7 +61,8 @@ subject_characteristics <- data %>%
 data_grid <- expand.grid(id = unique(data$id),
                          TIME_discrete = 0:max(data$TIME_discrete),
                          side = unique(data$side)) %>%
-  left_join(data%>%dplyr::select(-age, -age_scale, -age_discrete, -id_integer)) %>%
+  left_join(data %>% dplyr::select(-age, -age_scale, -age_discrete, 
+                                   -id_integer)) %>%
   mutate(R = is.na(y), # R denotes missingness
          learning = (TIME_discrete == 0)) %>%
   left_join(subject_characteristics, by = c("id" = "id")) #add the subject characteristics back in)
@@ -110,7 +111,7 @@ data_grid %>%
   arrange(age) %>%
   dplyr::select(3:(3 + max(data_grid$TIME_discrete))) %>%
   vis_miss() + ylab("id sorted by age") +
-  theme(plot.margin = margin(0,1,0,0, "cm")) 
+  theme(plot.margin = margin(0, 1, 0, 0, "cm")) 
 ```
 
 ```{r missingnessovertime, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Number of subjects the are present, return, drop out or are missing at each time instance.", fig.height = 4, fig.width=6}
@@ -140,7 +141,7 @@ data_grid %>%
                           "drop out", "missing"))) %>%
   ungroup() %>%
   ggplot() +
-  geom_bar(aes(x=TIME_discrete, fill = missing)) +
+  geom_bar(aes(x = TIME_discrete, fill = missing)) +
   scale_fill_discrete(name = "") +
   ylab("Number of subjects") + xlab("TIME") +
   theme_bw()
@@ -166,11 +167,12 @@ data_grid <- data_grid %>% mutate(
   R_num = 1*(R == TRUE),
   age_scale = scale(age, center = TRUE, scale = TRUE)) %>%
   group_by(id) %>%
-  mutate(R_num_lag = dplyr::lag(R_num, n = 1)) %>%
+  mutate(R_num_lag = dplyr::lag(R_num, n = 1),
+         y_last = tail(y[!is.na(y)],1)) %>%
   ungroup()
-m1 <- glmer(formula = R_num ~ TIME_discrete  + side + age_scale + R_num_lag + (1|id),
+m1 <- glmer(formula = R_num ~ TIME_discrete + side + age_scale + R_num_lag + (1|id),
         data = data_grid,
-        family=binomial(link = "logit"))
+        family = binomial(link = "logit"))
 s <- summary(m1) 
 s$coefficients %>% as.data.frame() %>%
   mutate(var = c('Intercept', "TIME", "sideright", "age", "$R_{t-1}$"),
@@ -180,7 +182,8 @@ s$coefficients %>% as.data.frame() %>%
   kable(booktabs = TRUE,
         caption = "A mixed model to predict missingness.",
         col.names = c('Variable', 'Estimate'),
-        row.names = FALSE ) %>%
+        row.names = FALSE, 
+        escape = FALSE) %>%
   kable_styling()
 ```
 
