@@ -202,6 +202,135 @@ All analysis was done in R. All scripts are freely available at [this git reposi
 
 ## Direct likelihood analysis versus multiple imputation
 
+For the purposes of this section we will analyze the hearing data respective to the continuous response. Two popular ways to analyze missing data is to use either a direct likelihood method or an analysis through multiple imputation. In a direct likelihood analysis missing values are imputed according to the general likelihood function defined on a per patient basis. The R package *lavaan* allows for the direct calculation for the patients’ likelihood functions through the use of their provided structural equation modeling techniques. This method does have its drawbacks, namely that patients which exhibit 0 variance in their hearing threshold evolution cannot have their likelihood functions calculated appropriately. To resolve this issue we removed the grouping factor from the modeling procedure. This approach does however make the direct likelihood method unappealing, as we lose the information defining the individual patient. This issue is then compounded with the models inability to be cross examined as the modeling procedure uses up all available degrees of freedom.
+
+```{r message=FALSE, include=FALSE}
+#direct lh (lavaan FIML)
+#data_grid$age_measurement=data_grid$age+data_grid$TIME_discrete
+
+
+library(lavaan)
+
+fit.dlh.cont=sem('y~age+TIME_discrete+learning+age:TIME_discrete',data=data_grid,missing="direct",fixed.x=FALSE)
+sum.dlh=summary(fit.dlh.cont)
+```
+
+```{r}
+library(tidySEM)
+# layoutmat=matrix(rep(NA,15),nrow=3)
+# layoutmat[1,3]="y"
+# layoutmat[2,2]="learning"
+# layoutmat[2,4]="age:Time_discrete"
+# layoutmat[3,3]="age"
+# layoutmat[3,5]="Time_discrete"
+#get_layout(fit.dlh.cont)
+sem_graph=graph_sem(fit.dlh.cont)
+sem_graph
+```
+
+```{r include=FALSE}
+# #MI
+# data_grid_cutdown=data_grid%>%transmute(id,y,TIME_discrete,age,learning)
+# 
+# library(mice)
+# data_grid_mice_norm=complete(mice(data_grid_cutdown,method = "norm"))
+# 
+# data_grid_mice_pmm=complete(mice(data_grid_cutdown,method = "pmm"))
+# 
+# data_grid_mice_mean=complete(mice(data_grid_cutdown,method = "mean"))
+# 
+# data_grid_mice_rf=complete(mice(data_grid_cutdown,method = "rf"))
+```
+
+To address the issues around direct likelihood analysis we adopt multiple imputation methods. Here artificial data points are generated according to the algorithms: Predictive mean matching, Bayesian linear regression, Unconditional mean imputation, and imputation by random forests. Being generated from an aggregation of 10 simulations, these simulated data points are then used in conjunction with the real data to draft appropriate models. These models were then compared against each other with the following summary statistics detailing the winning model according to AIC. 
+
+
+```{r include=FALSE}
+load(find_root_file("data/imputated_data.Rdata", 
+                    criterion = has_file("LDA.Rproj")))
+```
+
+```{r include=FALSE}
+data_imp_mean=data_imp_mean%>%rowwise()%>%mutate(impfullMED=median(c(impfull1,impfull2,impfull3,impfull4,impfull5,impfull6,impfull7,impfull8,impfull9,impfull10)))
+
+data_imp_norm=data_imp_norm%>%rowwise()%>%mutate(impfullMED=median(impfull1,impfull2,impfull3,impfull4,impfull5,impfull6,impfull7,impfull8,impfull9,impfull10))
+
+data_imp_pmm=data_imp_pmm%>%rowwise()%>%mutate(impfullMED=median(impfull1,impfull2,impfull3,impfull4,impfull5,impfull6,impfull7,impfull8,impfull9,impfull10))
+
+data_imp_rf=data_imp_rf%>%rowwise()%>%mutate(impfullMED=median(impfull1,impfull2,impfull3,impfull4,impfull5,impfull6,impfull7,impfull8,impfull9,impfull10))
+
+```
+
+```{r include=FALSE}
+library(nlme)
+
+lmeControl(maxIter = 1000)
+
+#fit.mi.norm.cont.simp=lme(y ~ age*TIME_discrete + learning + I(age^2),data = data_grid_mice_norm,random = ~1|id)
+
+fit.mi.pmm.cont.simp=lme(impfullMED ~ age*TIME_discrete + learning + I(age^2),data = data_imp_pmm,random = ~1|id)
+
+fit.mi.mean.cont.simp=lme(impfullMED ~ age*TIME_discrete + learning + I(age^2) ,data = data_imp_mean,random = ~1|id)
+
+fit.mi.mean.cont.simp.v2=lme(impfullMED ~ age*TIME_discrete + learning ,data = data_imp_mean,random = ~1|id)
+
+fit.mi.norm.cont.simp=lme(impfullMED ~ age*TIME_discrete + learning + I(age^2),data = data_imp_norm,random = ~1|id)
+
+fit.mi.rf.cont.simp=lme(impfullMED ~ age*TIME_discrete + learning + I(age^2),data = data_imp_rf,random = ~1|id)
+
+#fit.mi.rf.cont.simp=lme(y ~ age_scale*TIME_discrete + learning + I(age_scale^2),data = data_grid_mice_rf,random = ~1|id)
+```
+
+```{r include=FALSE}
+sum.mi.pmm.cont.simp=summary(fit.mi.pmm.cont.simp)
+sum.mi.mean.cont.simp=summary(fit.mi.mean.cont.simp)
+sum.mi.mean.cont.simp.v2=summary(fit.mi.mean.cont.simp.v2)
+sum.mi.cont.cont.simp=summary(fit.mi.norm.cont.simp)
+sum.mi.rf.cont.simp=summary(fit.mi.rf.cont.simp)
+```
+
+```{r include=FALSE}
+sum.mi.pmm.cont.simp$AIC
+sum.mi.mean.cont.simp$AIC
+sum.mi.mean.cont.simp.v2$AIC
+sum.mi.cont.cont.simp$AIC
+sum.mi.rf.cont.simp$AIC
+```
+
+```{r include=FALSE}
+#fit.mi.norm.cont.compsymm=lme(y ~ age_scale*TIME_discrete + learning + I(age_scale^2),data = data_grid_mice_norm,random = ~1|id,cor = nlme::corCompSymm())
+
+fit.mi.pmm.cont.compsymm=lme(impfullMED ~ age*TIME_discrete + learning + I(age^2),data = data_imp_pmm,random = ~1|id,cor = nlme::corCompSymm())
+
+fit.mi.mean.cont.compsymm=lme(impfullMED ~ age*TIME_discrete + learning + I(age^2),data = data_imp_mean,random = ~1|id,cor = nlme::corCompSymm())
+
+fit.mi.norm.cont.compsymm=lme(impfullMED ~ age*TIME_discrete + learning + I(age^2),data = data_imp_norm,random = ~1|id,cor = nlme::corCompSymm())
+
+fit.mi.rf.cont.compsymm=lme(impfullMED ~ age*TIME_discrete + learning + I(age^2),data = data_imp_rf,random = ~1|id,cor = nlme::corCompSymm())
+
+#fit.mi.rf.cont.compsymm=lme(y ~ age_scale*TIME_discrete + learning + I(age_scale^2),data = data_grid_mice_rf,random = ~1|id,cor = nlme::corCompSymm())
+```
+
+```{r include=FALSE}
+sum.mi.pmm.cont.compsymm=summary(fit.mi.pmm.cont.compsymm)
+sum.mi.mean.cont.compsymm=summary(fit.mi.mean.cont.compsymm)
+sum.mi.cont.cont.compsymm=summary(fit.mi.norm.cont.compsymm)
+sum.mi.rf.cont.compsymm=summary(fit.mi.rf.cont.compsymm)
+```
+
+```{r include=FALSE}
+sum.mi.pmm.cont.compsymm$AIC
+sum.mi.mean.cont.compsymm$AIC
+sum.mi.cont.cont.compsymm$AIC
+sum.mi.rf.cont.compsymm$AIC
+```
+
+
+```{r}
+finmodsum=sum.mi.mean.cont.simp.v2$tTable[,c(1,2,5)]
+round(finmodsum,3)
+```
+
 Q4
 
 ### Direct likelihood
