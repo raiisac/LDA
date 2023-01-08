@@ -1,0 +1,367 @@
+---
+title: "Assignment 3 Stefan part"
+output: pdf_document
+date: "2023-01-03"
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(haven) # to read SAS files
+library(knitr)
+library(qwraps2)
+library(rprojroot)
+library(patchwork)
+library(psych)
+library(gtools)
+library(ordinal)
+library(visdat)#visualize missingness
+library(mice)
+library(geepack)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load, include=FALSE, message=FALSE, warning=FALSE}
+trichotomization <- c(-100, 6, 25, 120)
+data <- read_sas("data/hearing500lr.sas7bdat") %>%
+  mutate(side = as.factor(side),
+         side_integer = as.integer(side),
+         TIME_discrete = round(TIME),
+         id = as.factor(id),
+         id_integer = as.integer(id),
+         age_measurement = age + TIME,
+         age_scale = unname(scale(age, center = TRUE, scale = TRUE)),
+         age_discrete = cut(age,
+                            breaks = c(0,30,50,70,100),
+                            labels = c("<30", "30-50", "50-70",">70")),
+         y_discrete = factor(as.factor(cut(y,
+                          breaks = trichotomization,
+                          labels = c("Excellent", "Normal", "Hearing loss"))),
+                          levels = c("Excellent", "Normal", "Hearing loss"),
+                          ordered = TRUE),
+         y_integer = as.integer(y_discrete),
+         learning = 1*(TIME == 0)) %>%
+  arrange(id)
+subject_characteristics <- data %>%
+  group_by(id) %>%
+  summarize(age = first(age),
+            age_scale = first(age_scale),
+            age_discrete = first(age_discrete),
+            id_integer = first(id_integer)) %>%
+  ungroup()
+  
+data_grid <- expand.grid(id = unique(data$id),
+                         TIME_discrete = 0:max(data$TIME_discrete),
+                         side = unique(data$side)) %>%
+  left_join(data%>%dplyr::select(-age, -age_scale, -age_discrete, -id_integer)) %>%
+  mutate(R = is.na(y), # R denotes missingness
+         learning = (TIME_discrete == 0)) %>%
+  left_join(subject_characteristics, by = c("id" = "id")) #add the subject characteristics back in)
+
+load("imputated_data.RData")
+```
+
+## Weighted generalized estimating equations versus 'multiple-imputation generalized estimating equations'
+
+In this section we will first explain our specification of the weighted generalized estimating equations, then we will explain the methodology behind the 'multiple-imputation generalized estimating equations' and finally we will compare the models.
+
+### Weighted generalized estimating equations
+
+First we specify the weights by using the inverse dropout probability methodology described in the lecture notes. The logistic regression model we used is the following; \begin{equation}
+\left\{
+                \begin{array}{ll}
+                logit(R) = \beta_0 + \beta_k TIME_k + \beta_3 side + \beta_4 age  + b \\
+                b \sim N(0,\sigma^2)\\
+                k=0 \dots22
+                \end{array}
+          \right.
+\end{equation}
+
+What we need to note is that for this model we create a dummy variable for each period in the TIME variable with the first being $TIME=0$ and the last $TIME=22$. As mentioned above there are certain periods (e.g. $TIME=1,3$) with very few observations. We specified the dummy variables with the hope of capturing any such effects. The model above had the best performance in terms of AIC. \newline After specifying the weights we proceed with model selection of the Weighted GEE. For this purpose we use QIC and a greedy methodology. Starting from a fully specified model we remove redundant variables from the model until we cannot simplify the model any more without sacrificing performance. The final model we chose contains the variables $$age + TIME + age^2+ age*TIME$$ As a final step we explore the correlation structure of the model using the QICu. The best performing is an independent correlation structure. The model coefficients as well as its error can be seen in the table bellow. We note that the variable $age$ is not significant but we nevertheless include it as $age^2$ is significant. Further we note that this model is almost the same as the best performing model for the normal un-weighted GEE, the only difference being that the later also includes the learning effect dummy variable for the first observation.
+
+```{r include=FALSE}
+library(geepack)
+data_grid<- data_grid %>% mutate("R_int"=1-as.numeric(data_grid$R))
+data_grid<- data_grid[order(data_grid$id, data_grid$TIME_discrete),]
+glmweight<-glm(R_int ~ as.factor(TIME_discrete)  + side + age_scale, data = data_grid, family = "binomial")
+summary(glmweight)
+
+wgee3 <- geeglm(y ~ age+TIME_discrete+age:TIME_discrete + I(age^2), 
+                data=data_grid, 
+                id=id,
+                family = "gaussian",
+                corstr="independence",
+                weights = glmweight[["fitted.values"]])
+
+
+d1<-as.data.frame(summary(wgee3)[["coefficients"]][1:2])
+d1<-d1 %>% 
+  mutate(across(where(is.numeric), round, digits=3))
+
+d<-d1
+
+
+d1[6,]<-c("RMSE",round(mean(sqrt(resid(wgee3)^2)),3))
+#d1[6,]<-c("RMSE",round(mean(na.omit(sqrt(resid(wgee3)[!is.na(data_grid$y)]^2))),3))
+
+row.names(d1)[6]<-" "
+
+
+```
+
+### Multiple Imputation generalized estimating equations
+
+In this section we will discuss the multiple imputation GEE approach. First as mentioned above we employ 4 different imputation methods. First Predictive mean matching, secondly Bayesian linear regression, thirdly Unconditional mean imputation and finally imputation by Random Forrest. For each we generate 10 Fully conditional and 10 Monotone multiple imputations leading to a total of 80 imputed data sets (40 FCS and 40 Monotone). The main idea of this method is to replace missing values with $M$ plausible values drawn from the conditional distribution of the missing values given the observed data. This conditional distribution represents how uncertain we are about the right value to impute. Given that we evaluate 3 Multiple imputation models. First a model based on all imputed data sets, both monotone and FCS, secondly a model based only on the FCS imputation, and thirdly a model based only on the monotone imputation. \newline
+
+From each imputed data set we evaluate $\widehat{\beta}^k$ using the same model and correlation structure as above. Here we note a few important points. First if we perform a model selection on the imputed data sets we notice that there are non trivial differences between the best performing model and its correlation structure for the different imputed data sets. We hypothesise that these differences arise from the large number of values we need to impute. For many subjects we have more imputed data than actual observations.Further if we do not impute values after the last true measurement of each subject, which greatly reduces the number of imputed values, both models and correlation structure stabilize into models similar to the best performing un-weighted GEE. Secondly if we impute less data points the performance of the MI GEE on the true data tends to be better. Nevertheless we will conduct the analysis with the full missing data imputation from $TIME=0$ to $TIME=22$. \newline After having evaluated all models based on the imputed data sets we get pool the results as follows. The coeficients are evaluated as $$
+\overline{\widehat{\beta}}=\frac{1}{M} \sum_{k=1}^M \widehat{\beta}^k
+$$ and an estimate of the covariance matrix of $\overline{\widehat{\beta}}$ is given by $$
+V=W+\left(\frac{M+1}{M}\right) B
+$$ where $$
+W=\frac{1}{M} \sum_{k=1}^M U^k \text { and } B=\frac{1}{M-1} \sum_{k=1}^M\left(\widehat{\beta}^k-\overline{\widehat{\beta}}\right)\left(\widehat{\beta}^k-\overline{\widehat{\beta}}\right)^{\prime}
+$$ here, $W$ measures the within-imputation variability and $B$ measures the between-imputation variability. Here the between-imputation variability is much larger, and it decreases if we reduce the number of imputed values.
+
+```{r include=FALSE}
+df<-data.frame("Intercept"=rep(NA,80),
+               "Intercept_var"=rep(NA,80),
+               "age"=rep(NA,80),
+               "age_var"=rep(NA,80),
+               "TIME_discrete"=rep(NA,80),
+               "TIME_discrete_var"=rep(NA,80),
+               "age_sqrd"=rep(NA,80),
+               "age_sqrd_var"=rep(NA,80),
+               "age_TIME"=rep(NA,80),
+               "age_TIME_var"=rep(NA,80),
+               "learning"=rep(NA,80),
+               "learning_var"=rep(NA,80),
+               "resid"=rep(NA,80))
+
+for (i in 1:20) {
+  mf<-as.formula(paste(colnames(data_imp_mean[7+i]),"~ age+TIME_discrete +age:TIME_discrete+ I(age^2)")) #+learninh
+  gee1 <- geeglm(mf, 
+                 data=data_imp_mean, 
+                 id=id,
+                 family = "gaussian",
+                 corstr="independence")
+  
+  df[i,1]<-summary(gee1)[["coefficients"]][[1]][[1]]
+  df[i,2]<-summary(gee1)[["coefficients"]][[2]][[1]]^2
+  df[i,3]<-summary(gee1)[["coefficients"]][[1]][[2]]
+  df[i,4]<-summary(gee1)[["coefficients"]][[2]][[2]]^2
+  df[i,5]<-summary(gee1)[["coefficients"]][[1]][[3]]
+  df[i,6]<-summary(gee1)[["coefficients"]][[2]][[3]]^2
+  df[i,7]<-summary(gee1)[["coefficients"]][[1]][[4]]
+  df[i,8]<-summary(gee1)[["coefficients"]][[2]][[4]]^2
+  df[i,9]<-summary(gee1)[["coefficients"]][[1]][[5]]
+  df[i,10]<-summary(gee1)[["coefficients"]][[2]][[5]]^2
+  #df[i,11]<-summary(gee1)[["coefficients"]][[1]][[6]]
+  #df[i,12]<-summary(gee1)[["coefficients"]][[2]][[6]]^2
+  #df[i,13]<-mean(sqrt(resid(gee1)^2))
+  df[i,13]<-mean(na.omit(sqrt(resid(gee1)[!is.na(data_grid$y)]^2)))
+    
+  gee2 <- geeglm(mf, 
+                 data=data_imp_norm, 
+                 id=id,
+                 family = "gaussian",
+                 corstr="independence")
+  j<-i+20
+  df[j,1]<-summary(gee2)[["coefficients"]][[1]][[1]]
+  df[j,2]<-summary(gee2)[["coefficients"]][[2]][[1]]^2
+  df[j,3]<-summary(gee2)[["coefficients"]][[1]][[2]]
+  df[j,4]<-summary(gee2)[["coefficients"]][[2]][[2]]^2
+  df[j,5]<-summary(gee2)[["coefficients"]][[1]][[3]]
+  df[j,6]<-summary(gee2)[["coefficients"]][[2]][[3]]^2
+  df[j,7]<-summary(gee2)[["coefficients"]][[1]][[4]]
+  df[j,8]<-summary(gee2)[["coefficients"]][[2]][[4]]^2
+  df[j,9]<-summary(gee2)[["coefficients"]][[1]][[5]]
+  df[j,10]<-summary(gee2)[["coefficients"]][[2]][[5]]^2
+  #df[j,11]<-summary(gee2)[["coefficients"]][[1]][[6]]
+  #df[j,12]<-summary(gee2)[["coefficients"]][[2]][[6]]^2
+  #df[j,13]<-mean(na.omit(sqrt(resid(gee2)[!is.na(data_grid$y)]^2)))
+  df[j,13]<-mean(sqrt(resid(gee2)^2))
+  
+  gee3 <- geeglm(mf, 
+                 data=data_imp_pmm, 
+                 id=id,
+                 family = "gaussian",
+                 corstr="independence")
+  k<-i+40
+  df[k,1]<-summary(gee3)[["coefficients"]][[1]][[1]]
+  df[k,2]<-summary(gee3)[["coefficients"]][[2]][[1]]^2
+  df[k,3]<-summary(gee3)[["coefficients"]][[1]][[2]]
+  df[k,4]<-summary(gee3)[["coefficients"]][[2]][[2]]^2
+  df[k,5]<-summary(gee3)[["coefficients"]][[1]][[3]]
+  df[k,6]<-summary(gee3)[["coefficients"]][[2]][[3]]^2
+  df[k,7]<-summary(gee3)[["coefficients"]][[1]][[4]]
+  df[k,8]<-summary(gee3)[["coefficients"]][[2]][[4]]^2
+  df[k,9]<-summary(gee3)[["coefficients"]][[1]][[5]]
+  df[k,10]<-summary(gee3)[["coefficients"]][[2]][[5]]^2
+  #df[k,11]<-summary(gee3)[["coefficients"]][[1]][[6]]
+  #df[k,12]<-summary(gee3)[["coefficients"]][[2]][[6]]^2
+  #df[k,13]<-mean(na.omit(sqrt(resid(gee3)[!is.na(data_grid$y)]^2)))
+  df[k,13]<-mean(sqrt(resid(gee3)^2))
+  
+  gee4 <- geeglm(mf, 
+                 data=data_imp_rf, 
+                 id=id,
+                 family = "gaussian",
+                 corstr="independence")
+  l<-i+60
+  df[l,1]<-summary(gee4)[["coefficients"]][[1]][[1]]
+  df[l,2]<-summary(gee4)[["coefficients"]][[2]][[1]]^2
+  df[l,3]<-summary(gee4)[["coefficients"]][[1]][[2]]
+  df[l,4]<-summary(gee4)[["coefficients"]][[2]][[2]]^2
+  df[l,5]<-summary(gee4)[["coefficients"]][[1]][[3]]
+  df[l,6]<-summary(gee4)[["coefficients"]][[2]][[3]]^2
+  df[l,7]<-summary(gee4)[["coefficients"]][[1]][[4]]
+  df[l,8]<-summary(gee4)[["coefficients"]][[2]][[4]]^2
+  df[l,9]<-summary(gee4)[["coefficients"]][[1]][[5]]
+  df[l,10]<-summary(gee4)[["coefficients"]][[2]][[5]]^2
+  #df[l,11]<-summary(gee4)[["coefficients"]][[1]][[6]]
+  #df[l,12]<-summary(gee4)[["coefficients"]][[2]][[6]]^2
+  #df[l,13]<-mean(na.omit(sqrt(resid(gee4)[!is.na(data_grid$y)]^2)))
+  df[l,13]<-mean(sqrt(resid(gee4)^2))
+  
+}
+
+
+row_odd <- seq_len(nrow(df)) %% 2
+df_monotone <- df[row_odd == 1, ]
+df_full <- df[row_odd == 0, ]
+
+
+
+
+Intercept_df<-mean(df$Intercept)
+age_df<-mean(df$age)
+TIME_discrete_df<-mean(df$TIME_discrete)
+learning_df<-mean(df$learning)
+age_sqrd_df<-mean(df$age_sqrd)
+age_TIME_df<-mean(df$age_TIME)
+learning_df<-mean(df$learning)
+residuals_mult<-mean(df$resid)
+
+
+Intercept_df_var<-mean(df$Intercept_var)+(81/80)*var(df$Intercept)
+age_df_var<-mean(df$age_var)+(81/80)*var(df$age)
+TIME_discrete_df_var<-mean(df$TIME_discrete_var)+(81/80)*var(df$TIME_discrete)
+age_sqrd_df_var<-mean(df$age_sqrd_var)+(81/80)*var(df$age_sqrd)
+age_TIME_df_var<-mean(df$age_TIME_var)+(81/80)*var(df$age_TIME)
+learning_df_var<-mean(df$learning_var)+(81/80)*var(df$learning_var)
+
+d2<-d
+d2[1,1]<-Intercept_df
+d2[1,2]<-sqrt(Intercept_df_var)
+d2[2,1]<-age_df
+d2[2,2]<-sqrt(age_df_var)
+d2[3,1]<-TIME_discrete_df
+d2[3,2]<-sqrt(TIME_discrete_df_var)
+d2[4,1]<-age_sqrd_df
+d2[4,2]<-sqrt(age_sqrd_df_var)
+#d2[5,1]<-learning_df
+#d2[5,2]<-sqrt(learning_df_var)
+d2[5,1]<-age_TIME_df
+d2[5,2]<-sqrt(age_TIME_df_var)
+
+d2<-d2 %>% 
+  mutate(across(where(is.numeric), round, digits=3))
+
+d2[6,]<-c("RMSE",round(residuals_mult,3))
+row.names(d2)[6]<-" "
+
+
+
+Intercept_mon<-mean(df_monotone$Intercept)
+age_mon<-mean(df_monotone$age)
+TIME_discrete_mon<-mean(df_monotone$TIME_discrete)
+learning_mon<-mean(df_monotone$learning)
+age_sqrd_mon<-mean(df_monotone$age_sqrd)
+age_TIME_mon<-mean(df_monotone$age_TIME)
+learning_mon<-mean(df_monotone$learning)
+residuals_mult_mon<-mean(df_monotone$resid)
+
+Intercept_df_var_mon<-mean(df_monotone$Intercept_var)+(81/80)*var(df_monotone$Intercept)
+age_df_var_mon<-mean(df_monotone$age_var)+(81/80)*var(df_monotone$age)
+TIME_discrete_df_var_mon<-mean(df_monotone$TIME_discrete_var)+(81/80)*var(df_monotone$TIME_discrete)
+age_sqrd_df_var_mon<-mean(df_monotone$age_sqrd_var)+(81/80)*var(df_monotone$age_sqrd)
+age_TIME_df_var_mon<-mean(df_monotone$age_TIME_var)+(81/80)*var(df_monotone$age_TIME)
+learning_df_var_mon<-mean(df_monotone$learning_var)+(81/80)*var(df_monotone$learning_var)
+
+d3<-d
+d3[1,1]<-Intercept_mon
+d3[1,2]<-sqrt(Intercept_df_var_mon)
+d3[2,1]<-age_mon
+d3[2,2]<-sqrt(age_df_var_mon)
+d3[3,1]<-TIME_discrete_mon
+d3[3,2]<-sqrt(TIME_discrete_df_var_mon)
+d3[4,1]<-age_sqrd_mon
+d3[4,2]<-sqrt(age_sqrd_df_var_mon)
+#d3[5,1]<-learning_mon
+#d3[5,2]<-sqrt(learning_df_var_mon)
+d3[5,1]<-age_TIME_mon
+d3[5,2]<-sqrt(age_TIME_df_var_mon)
+
+
+d3<-d3 %>% 
+  mutate(across(where(is.numeric), round, digits=3))
+
+d3[6,]<-c("RMSE",round(residuals_mult_mon,3))
+row.names(d3)[6]<-" "
+
+Intercept_full<-mean(df_full$Intercept)
+age_full<-mean(df_full$age)
+TIME_discrete_full<-mean(df_full$TIME_discrete)
+learning_full<-mean(df_full$learning)
+age_sqrd_full<-mean(df_full$age_sqrd)
+age_TIME_full<-mean(df_full$age_TIME)
+learning_full<-mean(df_monotone$learning)
+residuals_mult_full<-mean(df_full$resid)
+
+Intercept_df_var_full<-mean(df_full$Intercept_var)+(81/80)*var(df_full$Intercept)
+age_df_var_full<-mean(df_full$age_var)+(81/80)*var(df_full$age)
+TIME_discrete_df_var_full<-mean(df_full$TIME_discrete_var)+(81/80)*var(df_full$TIME_discrete)
+age_sqrd_df_var_full<-mean(df_full$age_sqrd_var)+(81/80)*var(df_full$age_sqrd)
+age_TIME_df_var_full<-mean(df_full$age_TIME_var)+(81/80)*var(df_full$age_TIME)
+learning_df_var_full<-mean(df_full$learning_var)+(81/80)*var(df_full$learning_var)
+
+d4<-d
+d4[1,1]<-Intercept_full
+d4[1,2]<-sqrt(Intercept_df_var_full)
+d4[2,1]<-age_full
+d4[2,2]<-sqrt(age_df_var_full)
+d4[3,1]<-TIME_discrete_full
+d4[3,2]<-sqrt(TIME_discrete_df_var_full)
+d4[4,1]<-age_sqrd_full
+d4[4,2]<-sqrt(age_sqrd_df_var_full)
+#d4[5,1]<-learning_full
+#d4[5,2]<-sqrt(learning_df_var_full)
+d4[5,1]<-age_TIME_full
+d4[5,2]<-sqrt(age_TIME_df_var_full)
+
+d4<-d4 %>% 
+  mutate(across(where(is.numeric), round, digits=3))
+
+d4[6,]<-c("RMSE",round(residuals_mult_full,3))
+row.names(d4)[6]<-" "
+
+d5<-cbind(d1,d2,d3,d4)
+d6<-cbind(rownames(d5),d5)
+colnames(d6)[1]<-""
+#d6<-d6[-5,]
+
+
+
+```
+
+
+```{r echo=FALSE}
+
+library(htmlTable)
+htmlTable(d6,
+          cgroup = c(c(" ","Weighted GEE", "MI GEE", "MI-Mon GEE", "MI-FCS GEE")),
+          n.cgroup = c(1,2,2,2,2),
+          rnames = FALSE)
+
+```
+
+In the table above we can see the coefficients for the weighted GEE, the Multiple Imputation GEE based on both monotone and FCS imputation, the MI GEE based only on monotone imputation and finally the MI GEE based only on FCS imputation.At the bottom we also record the Root Mean Squared Error for each model. We observe that the weighted GEE outperforms all 3 of the MI GEE models. We hypothesize that the reason for this is the large number of values which we needed to impute. Within the MI GEE the one based on monotone imputation performs the best.
+
