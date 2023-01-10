@@ -316,7 +316,8 @@ load("Ken Code/directlikelihoodresults.Rdata")
 sum.mi.mean.cont.simp <- sum.mi.mean.cont.simp%>%
   as.data.frame() %>%
   mutate(txtmean = sprintf("%.3f (%.3f)%s", estimate,  std.error, stars.pval(p.value)),
-         var = str_remove(str_remove(rownames(sum.mi.mean.cont.simp), "_discrete"), "TRUE"))%>%
+         var = str_remove(str_remove(rownames(sum.mi.mean.cont.simp), 
+                                     "_discrete"), "TRUE")) %>%
   dplyr::select(var, txtmean)
 
 #sum.mi.rf.cont.simp=round(summary(pool(fit.mi.rf.cont.simp,rule="reiter2003"))[,c(2:3,6)],3)
@@ -1276,6 +1277,7 @@ colnames(d6c)[1]<-""
 ```
 
 ```{r wGEEvsGEEMI, echo=FALSE}
+d6[, 1] <- str_remove(str_remove(d6[, 1], "_discrete"), "TRUE")
 d6 %>% as.data.frame() %>%
   kable(booktabs = TRUE,
         row.names = FALSE,
@@ -1287,6 +1289,7 @@ d6 %>% as.data.frame() %>%
 In Table \@ref(tab:wGEEvsGEEMI) we can see the coefficients for the weighted GEE, the Multiple Imputation GEE based on both monotone and FCS imputation, the MI GEE based only on monotone imputation and finally the MI GEE based only on FCS imputation. At the bottom, we also record the Root Mean Squared Error for each model. We observe that the weighted GEE outperforms all 3 of the MI GEE models. We hypothesize that the reason for this is the large number of values which we needed to impute. Within the MI GEE the one based on monotone imputation performs the best.
 
 ```{r GEEMImethods, echo=FALSE}
+d6a[, 1] <- str_remove(str_remove(d6a[, 1], "_discrete"), "TRUE")
 d6a %>% as.data.frame() %>%
   kable(booktabs = TRUE,
         row.names = FALSE,
@@ -1295,24 +1298,26 @@ d6a %>% as.data.frame() %>%
                      "MI GEE Rf" = 2))
 ```
 
-Next we will take a look at the performance of the different imputation methods individually. In Table \@ref(tab: GEEMImethods)  we discern between imputation methods but not between monotone or FCS; we average across the 10 monotone AND 10 FCS imputations. We see that the Unconditional mean imputation outperforms the other types of imputation with Random Forest imputation after it with nearly twice as high RMSE. The MI Method with unconditional mean imputation considering both monotone and FCS outperforms the weighted GEE. This gives rise to the question whether or not there is a difference between monotone and FCS imputation between different methods. We can see the results below.
+Next we will take a look at the performance of the different imputation methods individually. In Table \@ref(tab:GEEMImethods)  we discern between imputation methods but not between monotone or FCS; we average across the 10 monotone AND 10 FCS imputations. We see that the Unconditional mean imputation outperforms the other types of imputation with Random Forest imputation after it with nearly twice as high RMSE. The MI Method with unconditional mean imputation considering both monotone and FCS outperforms the weighted GEE. This gives rise to the question whether or not there is a difference between monotone and FCS imputation between different methods. We can see the results below.
 
-```{r GEEMImontone, echo=FALSE}
+```{r GEEMImonotone, echo=FALSE}
+d6b[, 1] <- str_remove(str_remove(d6b[, 1], "_discrete"), "TRUE")
 d6b %>% as.data.frame() %>%
   kable(booktabs = TRUE,
         row.names = FALSE,
         caption = "Model results for different imputation methods with monotone imputation.") %>%
-  add_header_above(c(" ","MI GEE Mean MON" = 2, "MI GEE Norm MON" = 2, 
-                     "MI GEE Pmm MON" = 2, "MI GEE Rf MON" = 2))
+  add_header_above(c(" ","MI GEE Mean" = 2, "MI GEE Norm" = 2, 
+                     "MI GEE Pmm" = 2, "MI GEE Rf" = 2))
 ```
 
 ```{r GEEMIfull, echo=FALSE}
+d6c[, 1] <- str_remove(str_remove(d6c[, 1], "_discrete"), "TRUE")
 d6c %>% as.data.frame() %>%
   kable(booktabs = TRUE,
         row.names = FALSE,
         caption = "Model results for different imputation methods with FCS imputation.") %>%
-  add_header_above(c(" ","MI GEE Mean FCS" = 2, "MI GEE Norm FCS" = 2, 
-                     "MI GEE Pmm FCS" = 2, "MI GEE Rf FCS" = 2))
+  add_header_above(c(" ","MI GEE Mean" = 2, "MI GEE Norm" = 2, 
+                     "MI GEE Pmm" = 2, "MI GEE Rf" = 2))
 ```
 
 In Table \@ref(tab:GEEMImonotone) and \@ref(tab:GEEMIfull), we compare the monotone and FCS imputation across all 4 different imputation methods. By far the best performing is the unconditional mean monotone imputation. It outperforms every other methodology and is the reason why the averaged unconditional mean method outperformed the weighted GEE.
