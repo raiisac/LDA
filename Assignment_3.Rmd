@@ -1406,7 +1406,7 @@ save(results, file = "data/resultssensitivity.Rdata")
 load("data/resultssensitivity.Rdata")
 ```
 
-```{r resultsintercept, echo=FALSE, fig.cap="Sensitivity analysis of the effect on the estimated intercept. The rows shows different values for deltage. The columns show different values for deltatime.", fig.width = 8}
+```{r resultsintercept, echo=FALSE, fig.cap="Sensitivity analysis of the effect on the estimated intercept. The rows shows different values for deltage. The columns show different values for deltatime.", fig.width = 8, fig.height = 8}
 results %>% filter(term == "(Intercept)") %>%
   mutate(term = str_remove(term, "_discrete")) %>%
   ggplot() +
@@ -1417,7 +1417,7 @@ results %>% filter(term == "(Intercept)") %>%
   facet_grid(rows = vars(deltaage), cols = vars(deltatime)) + theme_bw() + theme(legend.position="bottom")
 ```
 
-```{r resultssens,echo=FALSE, fig.cap="Sensitivity analysis of the effect on all parameter estimates, except for the intercept. The rows shows different values for deltage. The columns show different values for deltatime." , fig.width = 8}
+```{r resultssens,echo=FALSE, fig.cap="Sensitivity analysis of the effect on all parameter estimates, except for the intercept. The rows shows different values for deltage. The columns show different values for deltatime." , fig.width = 8, fig.height = 8}
 results %>% filter(term != "(Intercept)") %>%
   mutate(term = str_remove(term, "_discrete")) %>%
   ggplot() +
