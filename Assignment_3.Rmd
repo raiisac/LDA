@@ -203,30 +203,46 @@ Q4
 
 ## Direct Likelihood Analysis
 
-For the purposes of this section we will analyze the hearing data respective to the continuous response. Two popular ways to analyze data sets with missing data is to use either a direct likelihood method or an analysis through multiple imputation. In a direct likelihood analysis missing values are assumed to be ignorable [ref dlh vs mi]. Drafting a linear mixed effects model within R allows for the direct calculation for each patients' respective likelihood functions. The R-package "nlme" allows for this model to be fit in a way such that the parameter estimates are represntative of their parameters maximum log-likelihood. Aditionally, we will compare models of difering covariance structures: "simple"  and "compound symmetry." Summary statistics for these models can be seen in the following table. 
+For the purposes of this section we will analyze the hearing data respective to the continuous response. Two popular ways to analyze data sets with missing data is to use either a direct likelihood method or an analysis through multiple imputation. In a direct likelihood analysis, missing values are assumed to be ignorable [@BeunckensCaroline2005Dlav]. Drafting a linear mixed effects model within R allows for the direct calculation for each patients' respective likelihood functions. The R-package *nlme* allows for this model to be fit in a way such that the parameter estimates are representative of their parameters' maximum log-likelihood. Additionally, we will compare models of differing covariance structures: "simple"  and "compound symmetry." Summary statistics for these models can be seen in Table \@ref(tab:directlikelihood). 
 
 ```{r include=FALSE}
 library(nlme)
-fit.dlh.cont.simp=lme(y ~ age*TIME_discrete + learning + I(age^2),random = ~1|id,
-                 data=data_grid,
-                 na.action = na.omit,
-                 method = "ML",
-                 control=list(msMaxIter = 1000, msMaxEval = 1000))
+fit.dlh.cont.simp = lme(y ~ age*TIME_discrete + learning + I(age^2),
+                        random = ~1|id,
+                        data = data_grid,
+                        na.action = na.omit,
+                        method = "ML",
+                        control = list(msMaxIter = 1000, msMaxEval = 1000))
 
-fit.dlh.cont.compsymm=lme(y ~ age*TIME_discrete + learning + I(age^2),random = ~1|id,
-                 data=data_grid,
-                 na.action = na.omit,
-                 method = "ML",
-                 cor = nlme::corCompSymm(),
-                 control=list(msMaxIter = 1000, msMaxEval = 1000))
+fit.dlh.cont.compsymm = lme(y ~ age*TIME_discrete + learning + I(age^2),
+                            random = ~1|id,
+                            data = data_grid,
+                            na.action = na.omit,
+                            method = "ML",
+                            cor = nlme::corCompSymm(),
+                            control = list(msMaxIter = 1000, msMaxEval = 1000))
 ```
 
-```{r include=FALSE}
-sum.dlh.simp=summary(fit.dlh.cont.simp)
-round(sum.dlh.simp$tTable[,c(1,2,5)],3)
+```{r directlikelihood, include=FALSE}
+sum.dlh.simp = summary(fit.dlh.cont.simp)
+simple <- round(sum.dlh.simp$tTable[,c(1,2,5)],3) %>%
+  as.data.frame() %>%
+  mutate(txt = sprintf("%.3f (%.3f)%s", Value,  Std.Error, stars.pval(`p-value`)),
+         var = rownames(sum.dlh.simp$tTable))%>%
+  dplyr::select(var, txt)
 
 sum.dlh.compsymm=summary(fit.dlh.cont.compsymm)
-round(sum.dlh.compsymm$tTable[,c(1,2,5)],3)
+cs <- round(sum.dlh.compsymm$tTable[,c(1,2,5)],3) %>%
+  as.data.frame() %>%
+  mutate(txt2 = sprintf("%.3f (%.3f)%s", Value,  Std.Error, stars.pval(`p-value`)))%>%
+  dplyr::select(txt2)
+
+simple %>% cbind(cs) %>%
+  kable(booktabs = TRUE,
+        col.names = c("Variable", "Estimate (std.error)", "Estimate (std.error)"),
+        caption = "Direct likelihood results.",
+        row.names = FALSE) %>%
+  add_header_above(c("", "Simple cov. struct.", "Compound Symmetry cov. struct."))
 ```
 
 Parameter estimates from both covariance structures remains constant
@@ -422,8 +438,8 @@ Using frequentist methods,
 Q5
 
 ## Sensitivity analysis
+It is likely that different assumption on the missingness mechanism will lead to different conclusions, especially if the dropout is higher than 10% [@10.3389/fpsyg.2017.00722].
 
-Q6
 
 # Bibliography
 
