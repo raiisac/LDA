@@ -79,11 +79,7 @@ This report assesses the evolution of hearing thresholds over time for a sample 
 
 First, the *TIME* variable is rounded to the nearest integer value. As such, we aim to balance the dataset with equally-spaced time instances when hearing thresholds are measured. 
 
-Hearing thresholds will be explored, both as a continuous variable and as a trichotomized (ordinal) variable with the following three levels:
-
-- $\leq$ 6 dB: Excellent hearing
-- over 6 and $\leq$ 25 dB: Normal hearing
-- $\geq$ 26 dB: Hearing loss
+Hearing thresholds will be explored as a continuous variable.
 
 ## Missingness exploration
 ```{r Missingnessprep, include=FALSE, message=FALSE, warning=FALSE}
@@ -1326,13 +1322,13 @@ In Table \@ref(tab:GEEMImonotone) and \@ref(tab:GEEMIfull), we compare the monot
 
 In the previous sections, some sensitivity analysis was done with respect to the different possible imputation methods. Usually, the model results were quite stable. However, all of the previous models assume MAR. In this section, we explore whether the results are robust if the MAR assumption is not realistic and the missingness is not at random (MNAR). Whether or not there is MAR or MNAR cannot be easily and directly tested since we can never know for sure what the hearing threshold would have been if it is missing [@verbeke2001sensitivity; @van2001local]. It is likely that different assumption on the missingness mechanism will lead to different conclusions, especially if the dropout is higher than 10% [@10.3389/fpsyg.2017.00722]. The dropout/missingness is much higher in our dataset and, results are thus expected to be highly impacted.
 
-We use imputation under a MNAR mechanism by the NARFCS method [see @tompsett2018use and [this useful vignette]{https://github.com/moreno-betancur/NARFCS/blob/master/Vignette.md}]. This method allows us the test the effect of different shifts in the MNAR imputed values on the model coefficients. These shifts may also depend on other covariates (such as age and time, see the unidentifiable part in the equation below). Notice that the unidentifiable part will only come into play when an observation is missing ($R_y=1$). More concretely, The imputed values are of the following form:
+We use imputation under a MNAR mechanism by the not at random fully conditional specification (NARFCS) procedure [see @tompsett2018use and [this useful vignette]{https://github.com/moreno-betancur/NARFCS/blob/master/Vignette.md}]. This method works, even is the missingness is not monotone, and allows us to test the effect of different shifts in the MNAR imputed values on the model coefficients. These shifts may also depend on other covariates (such as age and time, see the unidentifiable part in the equation below). Notice that the unidentifiable part will only come into play when an observation is missing ($R_y=1$). More concretely, The imputed values are of the following form:
 
 \begin{align} 
 {E(Y|X,R_Y)} =&\underbrace{\beta_{Y0}+ \beta_{Yage} age + \beta_{Yage2} age^2 + \beta_{Ytime} TIME + \beta_{Ytimeage} TIME:age}_\text{IDENTIFIABLE PART}\ \\&+\underbrace{R_Y(\delta_{Y0}+\delta_{Yage} age+\delta_{Yage2} age^2 + \delta_{Ytime} TIME + \delta_{Ytimeage} TIME:age)}_\text{UNIDENTIFIABLE PART}. 
 \end{align}
 
-In practice, it is suggested that the sensitivity parameters ($\delta$'s) are discussed and chosen with practitioners. For instance, in the hypothetical case that people were asked not let their hearing be measured when they have a cold, the hearing threshold might be higher if the data is missing and practitioners may have some intuition as to how much higher. Here, we don't have any information from practitioners and implement the following shifts as an illustration:
+In practice, it is suggested that the sensitivity parameters ($\delta$'s) are discussed and chosen with practitioners. For instance, in the hypothetical case that people were asked not let their hearing be measured when they have a cold, the hearing threshold might be higher if the data is missing and practitioners may have some intuition as to how much higher. It should be noted that eliciting these parameters can betricky because they are *conditional* on all other parameters (see also section 5). Here, we don't have any information from practitioners and implement the following shifts as an illustration:
 
   - A shift in the intercept: $\delta_{Y0} \in \{-5; -2;0;2;5\}$. This means that the imputation for the missing values will differ between -5 to 5 dB from expected values in MAR, on average.
   - A shift in the effect of age $\delta_{Yage} \in \{-1; -0.5;0;0.5;1\}$. 
@@ -1495,7 +1491,7 @@ results %>% filter(term != "(Intercept)") %>%
                       values = c('forestgreen','grey','red')) + 
   xlab(TeX(r'($\delta_{Y0}$)')) + 
   ylab(TeX(r'($\delta_{Yage}$)')) + 
-  scale_x_continuous(breaks = c(-5, -2, 0, 2, 5)) + guides(alpha = FALSE) 
+  scale_x_continuous(breaks = c(-5, -2, 0, 2, 5)) + guides(alpha = "none") 
 ```
 
 # Conclusion
@@ -1520,10 +1516,12 @@ test <- data_grid %>%
                        max(y, na.rm = T))) %>%
   ungroup()
 missingperc <- sum(is.na(test$y))/nrow(test)
+#link to author paper prof molenberghs
+#https://documentserver.uhasselt.be/bitstream/1942/33320/2/CIS-MI-MLR-2020.09.22.09.00.pdf
 ```
 It might be useful to replicated the current analysis but with a coarser time frame. In this report, time was discretized by rounding down the time for each measurement. That resulted in 23 time instances (year 0 until year 22) and a lot of missing data since many subjects return, on average, around every two years (81.8% missingness Figure \@ref(fig:Missingness)). Changing the time scale to $\{0, 2, 4, ..., 22\}$ yields only 12 time instances and decreases missingness to `r round(100*missingperc,2)`% and the missingness comes closer to monotone missingness.
 
-The sensitivity analysis using NARFCS may also be improved upon with the input of practitioners. Additionally, many other MNAR sensitivity analyses exist and may yield different insights.
+The sensitivity analysis using NARFCS may also be improved upon because there exist many other MNAR sensitivity analyses that may yield different insights [see for instance @uranga2022multiple ; @de2017comparison]. A downside of NARFCS, for instance, is that the sensitivity parameters are conditional parameters. THey represent differences in the distribution of the observed and missing values of each variable, *conditional* on the other variables, and *conditional* on the missingness indicators of the other variables. These parameters are therefor essentially impossible to elicit directly from experts, and differs from the marginal difference between the observed and missing values for the variable. This means that choosing values for the conditional sensitivity parameters involved in NARFCS is tricky.
 
 # Bibliography
 
