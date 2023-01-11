@@ -14,6 +14,7 @@ bibliography: references.bib
 ---
 
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(broom.mixed)
 library(tidyverse)
 library(haven) # to read SAS files
 library(kableExtra)
@@ -21,10 +22,14 @@ library(qwraps2)
 library(rprojroot)
 library(patchwork)
 library(psych)
+library(geepack)
 library(gtools)
 library(ordinal)
 library(visdat)#visualize missingness
 library(mice)
+library(nlme)
+library(lme4)
+library(latex2exp)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -162,7 +167,6 @@ Lastly we explore whether the missingness can be explained by the data by fittin
 The variable *age* was standardized to get convergence in the model. Table \@ref(tab:missingmixedmodel) shows that TIME is significant; as time increases, subjects are more likely to be missing. We can therefore assume missingness at random (MAR). Left ear measurements are also more likely to be missing. A subject is also less likely to be missing at time $t$ if he was missing at time $t-1$. This can be seen especially in the first couple of years in figure \@ref(fig:Missingness): all but 3 subjects are measured at $t=0$, almost no-one is measured at $t=1$ and many are measured again at $t=2$.
 
 ```{r missingmixedmodel, include=TRUE, echo = FALSE, message=FALSE, warning=FALSE, eval=TRUE}
-library(lme4)
 data_grid <- data_grid %>% mutate(
   R_num = 1*(R == TRUE),
   age_scale = scale(age, center = TRUE, scale = TRUE)) %>%
@@ -205,7 +209,6 @@ All analysis was done in R. All scripts are freely available at [this git reposi
 For the purposes of this section we will analyze the hearing data respective to the continuous response. Two popular ways to analyze data sets with missing data is to use either a direct likelihood method or an analysis through multiple imputation. In a direct likelihood analysis, missing values are assumed to be ignorable [@BeunckensCaroline2005Dlav]. Drafting a linear mixed effects model within R allows for the direct calculation for each patients' respective likelihood functions. The R-package *nlme* allows for this model to be fit in a way such that the parameter estimates are representative of their parameters' maximum log-likelihood. Additionally, we will compare models of differing covariance structures: "simple"  and "compound symmetry." Summary statistics for these models can be seen in Table \@ref(tab:DLMISimple). 
 
 ```{r include=FALSE}
-library(nlme)
 fit.dlh.cont.simp = lme(y ~ age*TIME_discrete + learning + I(age^2),
                         random = ~1|id,
                         data = data_grid,
@@ -260,7 +263,6 @@ load(find_root_file("data/intermediate/raw_imputation.Rdata",
 # #MI
 data_grid_cutdown=data_grid%>%transmute(id,y,TIME_discrete,age,learning)
 #
-library(mice)
 data_grid_mice_norm_long=as.mids(complete(data_grid_mice_norm,action="long",include=TRUE))
 #
 data_grid_mice_pmm_long=as.mids(complete(data_grid_mice_pmm,action="long",include=TRUE))
@@ -309,7 +311,6 @@ fit.mi.rf.cont.simp = with(data_grid_mice_rf_long,
 ```
 
 ```{r DLMISimple, include=TRUE, echo=FALSE, warning = FALSE, message = FALSE}
-library(broom.mixed)
 load("Ken Code/directlikelihoodresults.Rdata")
 #sum.mi.mean.cont.simp = round(summary(pool(fit.mi.mean.cont.simp,rule = "reiter2003"))[,c(2:3,6)],3)
 #rownames(sum.mi.mean.cont.simp)=summary(pool(fit.mi.mean.cont.simp,rule="reiter2003"))[,1]
@@ -517,7 +518,6 @@ First we specify the weights by using the inverse dropout probability methodolog
 It should be noted that we created a dummy variable for each period in the TIME variable with the first being $TIME=0$ and the last $TIME=22$. There are certain periods (e.g. $TIME=1,3$) with very few observations. We specified the dummy variables with the hope of capturing any such effects. The model above had the best performance in terms of AIC. \newline After specifying the weights, we proceed with model selection of the Weighted GEE. For this purpose, we use QIC and a greedy methodology. Starting from a fully specified model we remove redundant variables from the model until we cannot simplify the model any more without sacrificing performance. The final model we chose contains the variables $$age + TIME + age^2+ age*TIME$$ As a final step we explore the correlation structure of the model using the QICu. The best performing is an independent correlation structure. The model coefficients as well as its error can be seen in the table bellow. We note that the variable $age$ is not significant but we nevertheless include it as $age^2$ is significant. Further we note that this model is almost the same as the best performing model for the normal un-weighted GEE, the only difference being that the later also includes the learning effect dummy variable for the first observation.
 
 ```{r include=FALSE}
-library(geepack)
 data_grid<- data_grid %>% mutate("R_int"=1-as.numeric(data_grid$R))
 data_grid<- data_grid[order(data_grid$id, data_grid$TIME_discrete),]
 glmweight<-glm(R_int ~ as.factor(TIME_discrete)  + side + age_scale, data = data_grid, family = "binomial")
@@ -1324,21 +1324,21 @@ In Table \@ref(tab:GEEMImonotone) and \@ref(tab:GEEMIfull), we compare the monot
 
 ## Sensitivity analysis
 
-In the previous sections, some sensitivity analysis was done with respect to the different possible imputation methods. Usually, the model results were quite stable. However, all of the previous models assume MAR. In this section, we explore whether the results are robust if the MAR assumption is not realistic and the missingness is not at random (MNAR). Whether or not there is MAR or MNAR cannot be easily and directly tested since we can never know for sure what the hearing threshold would have been if it is missing [@verbeke2001sensitivity; @van2001local]. It is likely that different assumption on the missingness mechanism will lead to different conclusions, especially if the dropout is higher than 10% [@10.3389/fpsyg.2017.00722]. The dropout/missingness is much higher in our dataset and, thus expected to be highly impacted.
+In the previous sections, some sensitivity analysis was done with respect to the different possible imputation methods. Usually, the model results were quite stable. However, all of the previous models assume MAR. In this section, we explore whether the results are robust if the MAR assumption is not realistic and the missingness is not at random (MNAR). Whether or not there is MAR or MNAR cannot be easily and directly tested since we can never know for sure what the hearing threshold would have been if it is missing [@verbeke2001sensitivity; @van2001local]. It is likely that different assumption on the missingness mechanism will lead to different conclusions, especially if the dropout is higher than 10% [@10.3389/fpsyg.2017.00722]. The dropout/missingness is much higher in our dataset and, results are thus expected to be highly impacted.
 
-We use imputation under a MNAR mechanism by the NARFCS method [see @tompsett2018use and [this useful vignette]{https://github.com/moreno-betancur/NARFCS/blob/master/Vignette.md}]. This method allows us the test the effect of different shifts in the MNAR imputed values on the model coefficients (see the unidentifiable part in the equation below). Notice that the unidentifiable part will only come into play when $R_y=1$. These shifts may also depend on other covariates (such as age and time). More concretely, The imputed values are of the following form ($R_y = 1$ if the observation is missing):
+We use imputation under a MNAR mechanism by the NARFCS method [see @tompsett2018use and [this useful vignette]{https://github.com/moreno-betancur/NARFCS/blob/master/Vignette.md}]. This method allows us the test the effect of different shifts in the MNAR imputed values on the model coefficients. These shifts may also depend on other covariates (such as age and time, see the unidentifiable part in the equation below). Notice that the unidentifiable part will only come into play when an observation is missing ($R_y=1$). More concretely, The imputed values are of the following form:
 
 \begin{align} 
 {E(Y|X,R_Y)} =&\underbrace{\beta_{Y0}+ \beta_{Yage} age + \beta_{Yage2} age^2 + \beta_{Ytime} TIME + \beta_{Ytimeage} TIME:age}_\text{IDENTIFIABLE PART}\ \\&+\underbrace{R_Y(\delta_{Y0}+\delta_{Yage} age+\delta_{Yage2} age^2 + \delta_{Ytime} TIME + \delta_{Ytimeage} TIME:age)}_\text{UNIDENTIFIABLE PART}. 
 \end{align}
 
-In practice, it is suggested that these sensitivity parameters are discussed and chosen with practitioners. They might, for instance, have the intuition that, since people are asked not let their hearing be measured when they have a cold, the hearing threshold might be higher if the data is missing. Here, we don't have any information from practitioners and implement the following shifts:
+In practice, it is suggested that the sensitivity parameters ($\delta$'s) are discussed and chosen with practitioners. For instance, in the hypothetical case that people were asked not let their hearing be measured when they have a cold, the hearing threshold might be higher if the data is missing and practitioners may have some intuition as to how much higher. Here, we don't have any information from practitioners and implement the following shifts as an illustration:
 
-  - A shift in the intercept: $\delta_{Y0} \in \{-5; -2;0;2;5\}$. This means that missing values will be imputed between -5, up to 5 dB higher than expected on average.
+  - A shift in the intercept: $\delta_{Y0} \in \{-5; -2;0;2;5\}$. This means that the imputation for the missing values will differ between -5 to 5 dB from expected values in MAR, on average.
   - A shift in the effect of age $\delta_{Yage} \in \{-1; -0.5;0;0.5;1\}$. 
   - A shift in the effect of time $\delta_{Ytime} \in \{-1; -0.5;0;0.5;1\}$. 
 
-In each of the 125 (5*5*5) scenarios, We will impute the data ten times and will fit a GEE model on the imputed data. Final results in each scenario are then obtained using the same methodology as in section 3.2.2.
+In each of the 125 (5*5*5) scenarios, We will impute the data ten times and will fit a GEE model on the imputed data. Final results in each scenario are then obtained using the same methodology as in section 3.2.2. 
 
 ```{r echo=FALSE, eval=!file.exists("data/resultssensitivity.Rdata")}
 getimputationsummary <- function(data, intercept, deltaage, deltatime, formula, predSens, sensFormula, m){
@@ -1363,8 +1363,8 @@ getimputationsummary <- function(data, intercept, deltaage, deltatime, formula, 
       mutate(intercept = intercept,
              deltaage = deltaage,
              deltatime = deltatime,
-             lb = estimate + qt(p = .025, df = nbobs-5)*std.error,
-             ub = estimate + qt(p = .975, df = nbobs-5)*std.error)
+             lb = estimate + qt(p = .025, df = df)*std.error,
+             ub = estimate + qt(p = .975, df = df)*std.error)
     return(res)
 }
 
@@ -1373,13 +1373,15 @@ filtereddata <- data_grid %>%
   mutate(age2 = age*age,
          timeage = TIME_discrete*age)
 #Set-up predictor matrix for identifiable part
-predMatrix<-matrix(rep(0,ncol(filtereddata)*ncol(filtereddata)),ncol=ncol(filtereddata))
-colnames(predMatrix) <- rownames(predMatrix)<-names(filtereddata)
+predMatrix <- matrix(rep(0, ncol(filtereddata) * ncol(filtereddata)), 
+                     ncol = ncol(filtereddata))
+colnames(predMatrix) <- rownames(predMatrix) <- names(filtereddata)
 predMatrix["y",] <- c(0,1,1,0,1,1)#we're only predicting y with everything except id
 
-predSens<-matrix(rep(0,ncol(filtereddata)*ncol(filtereddata)),ncol=ncol(filtereddata))
-colnames(predSens)<-paste(":",names(filtereddata),sep="")
-rownames(predSens)<-names(filtereddata)
+predSens <- matrix(rep(0, ncol(filtereddata) * ncol(filtereddata)), 
+                   ncol = ncol(filtereddata))
+colnames(predSens) <- paste(":", names(filtereddata), sep = "")
+rownames(predSens) <- names(filtereddata)
 predSens["y",] <- c(0, 1, 1, 0, 0, 0)# we also want to use time and age to predict the unobserved part.
 results <- data.frame()
 for (intercept in c(-5, -2, 0, 2, 5)) {
@@ -1406,51 +1408,122 @@ save(results, file = "data/resultssensitivity.Rdata")
 load("data/resultssensitivity.Rdata")
 ```
 
-```{r resultsintercept, echo=FALSE, fig.cap="Sensitivity analysis of the effect on the estimated intercept. The rows shows different values for deltage. The columns show different values for deltatime.", fig.width = 8, fig.height = 8}
+```{r resultsintercept, echo=FALSE, fig.cap="Sensitivity analysis of the effect on the estimated intercept and the 95 percent confidence intervals. The rows show different values for deltage. The columns show different values for deltatime. The confidence intervals are less bright if the confidence interval entails zero.", fig.width = 8, fig.height = 8}
+appendertime <- function(string) 
+    TeX(paste("$\\delta_{Ytime} = $", string))  
+appenderage <- function(string) 
+    TeX(paste("$\\delta_{Yage} = $", string)) 
 results %>% filter(term == "(Intercept)") %>%
-  mutate(term = str_remove(term, "_discrete")) %>%
+  mutate(term = str_remove(term, "_discrete"),
+         significant = (p.value < 0.05)) %>%
   ggplot() +
-  geom_line(aes(x=intercept, y = estimate, color = term)) +
-  geom_point(aes(x=intercept, y = estimate, color = term)) +
-  geom_errorbar(aes(x=intercept, ymin = ub, ymax = lb, color = term), 
-                position=position_dodge(0.1)) +
-  facet_grid(rows = vars(deltaage), cols = vars(deltatime)) + theme_bw() + theme(legend.position="bottom")
+  geom_line(aes(x = intercept, y = estimate, color = term)) +
+  geom_point(aes(x = intercept, y = estimate, color = term, 
+                 alpha = significant)) +
+  geom_errorbar(aes(x = intercept, ymin = ub, ymax = lb, color = term, 
+                    alpha = significant), 
+                position = position_dodge(0.1)) +
+  geom_hline(aes(yintercept = 0)) + 
+  facet_grid(rows = vars(deltaage),
+             cols = vars(deltatime),
+             labeller = labeller(
+               .rows = as_labeller(appenderage,
+                                   default = label_parsed),
+               .cols = as_labeller(appendertime, 
+                                   default = label_parsed))) + 
+  theme_bw() + theme(legend.position = "bottom") + 
+  scale_alpha_discrete(range = c(0.3,1)) + 
+  xlab(TeX(r'($\delta_{Y0}$)')) + 
+  scale_x_continuous(breaks = c(-5, -2, 0, 2, 5))
 ```
 
-```{r resultssens,echo=FALSE, fig.cap="Sensitivity analysis of the effect on all parameter estimates, except for the intercept. The rows shows different values for deltage. The columns show different values for deltatime." , fig.width = 8, fig.height = 8}
+```{r resultssens,echo=FALSE, fig.cap="Sensitivity analysis of the effect on all parameter estimates, except for the intercept. The rows show different values for deltage. The columns show different values for deltatime. The 95 percent confidence intervals are less bright if the confidence interval entails zero." , fig.width = 8, fig.height = 8}
 results %>% filter(term != "(Intercept)") %>%
-  mutate(term = str_remove(term, "_discrete")) %>%
+  mutate(term = str_remove(term, "_discrete"),
+         significant = (p.value < 0.05)) %>%
   ggplot() +
   geom_line(aes(x=intercept, y = estimate, color = term)) +
-  geom_point(aes(x=intercept, y = estimate, color = term)) +
-  geom_errorbar(aes(x=intercept, ymin = ub, ymax = lb, color = term), 
-                position=position_dodge(width = 0.1)) +
-  facet_grid(rows = vars(deltaage), cols = vars(deltatime)) + theme_bw() + theme(legend.position="bottom")
+  geom_point(aes(x = intercept, y = estimate, color = term, 
+                 alpha = significant)) +
+  geom_errorbar(aes(x = intercept, ymin = ub, ymax = lb, color = term, 
+                    alpha = significant), 
+                position = position_dodge(0.1)) +
+  geom_hline(aes(yintercept = 0)) + 
+  facet_grid(deltaage ~ deltatime,
+             labeller = labeller(
+               .rows = as_labeller(appenderage,
+                                   default = label_parsed),
+               .cols = as_labeller(appendertime, 
+                                   default = label_parsed))) + 
+  theme_bw() + theme(legend.position = "bottom") + 
+  scale_alpha_discrete(range = c(0.3,1)) + 
+  xlab(TeX(r'($\delta_{Y0}$)')) + 
+  scale_x_continuous(breaks = c(-5, -2, 0, 2, 5))
 ```
 
-A shift in the intercept for imputed data results in an almost equal shift in the intercept from the gee model. This was expected because such a large part of the data is imputed. 
+```{r include = FALSE}
+interceptchange <- results %>%
+  group_by(deltatime, deltaage, term) %>%
+  summarize(diffintercept = max(estimate) - min(estimate)) %>%
+  ungroup()
+```
+
+Figure \@ref(fig:resultsintercept) shows the estimated intercepts and \@ref(fig:resultssens) shows all other parameter estimates. 
+
+A shift in the intercept for imputed data ($\delta_{Y0}$) of 1 dB results in an almost equal shift in the estimated intercept from the gee model (`r round(mean(unlist(interceptchange[interceptchange$term == "(Intercept)","diffintercept"]))/10,2)` dB). This was expected because such a large part of the data is imputed. It is, however, more interesting to look at the other parameter estimates. Figure \@ref(fig:resultssens2) shows the effects on the different variables even clearer. 
+
+The parameter estimate for age is usually negative, except when $\delta_{Ytime}$ and $\delta_{Yage}$ are very negative. The interaction effect between time and age is always positive when $\delta_{Y0} >=0$ and negative or insignificant if $\delta_{Y0}<0$. The parameter estimate for $age^2$ is usually positive, unless all three $\delta$'s become negative. The parameter does not seem very impacted by $\delta_{Ytime}$ or $\delta_{Y0}$ but it is very sensitive to changes in $\delta_{Yage}$.
+
+```{r resultssens2,echo=FALSE, fig.cap= "Heatmap for all parameter estimates, except for the intercept. The rows show the different parameters (covariates). The columns show different values for deltatime." , fig.width = 8, fig.height = 8}
+results %>% filter(term != "(Intercept)") %>%
+  mutate(term = str_remove(term, "_discrete"),
+         significant = (p.value < 0.05),
+         color = ifelse(significant,
+                        ifelse(estimate>0, "positive","negative"),
+                        "not significant")) %>%
+  ggplot() +
+  geom_tile(aes(color = color, fill = color, alpha = estimate, x = intercept, y= deltaage)) +
+  geom_hline(aes(yintercept = 0)) + 
+  facet_grid(term ~ deltatime,
+             labeller = labeller(
+               .cols = as_labeller(appendertime, 
+                                   default = label_parsed))) + 
+  theme_bw() + theme(legend.position = "bottom") + 
+  scale_fill_manual(name = "", breaks = c("positive","not significant", "negative" ),
+                      values = c('green','grey','red')) + 
+  scale_color_manual(name = "", breaks = c("positive","not significant", "negative" ),
+                      values = c('forestgreen','grey','red')) + 
+  xlab(TeX(r'($\delta_{Y0}$)')) + 
+  ylab(TeX(r'($\delta_{Yage}$)')) + 
+  scale_x_continuous(breaks = c(-5, -2, 0, 2, 5)) + guides(alpha = FALSE) 
+```
 
 # Conclusion
 
-The hearing threshold dataset it very unbalanced and a lot of data is missing. Therefore, one needs to be very careful about the interpretation of model that are fit on the data. Any violation of MAR may have a significant impact on the model estimates.
+The hearing threshold dataset it very unbalanced and a lot of data is missing. Therefore, one needs to be very careful when interpreting models that are fit on the incomplete data. 
+
+Both direct likelihood methods and general estimating equations with and without multiple imputation are tested on the data. Generally, all models still confirm that subjects loose hearing as time passes and as the get older, regardless of the imputation method. There is also still some support for a learning effect meaning subjects seem to have worse hearing the first time they undergo the test, as was also observed in previous literature.
+
+Any violation of MAR may have a significant impact on the model estimates, as shown in the sensitivity analysis.
 
 # Future research
 
 ```{r include = FALSE}
 #calculate missingness if time scale is every two years
 test <- data_grid %>%
-  mutate(TIME_discrete = ifelse(TIME_discrete %% 2 ==0,
+  mutate(TIME_discrete = ifelse(TIME_discrete %% 2 == 0,
                                 TIME_discrete,
-                                TIME_discrete-1)) %>%
+                                TIME_discrete - 1)) %>%
   group_by(id, TIME_discrete) %>%
-  summarize(y = ifelse(sum(!is.na(y))==0,
+  summarize(y = ifelse(sum(!is.na(y)) == 0,
                        NA,
-                       max(y, na.rm=T))) %>%
+                       max(y, na.rm = T))) %>%
   ungroup()
 missingperc <- sum(is.na(test$y))/nrow(test)
 ```
 It might be useful to replicated the current analysis but with a coarser time frame. In this report, time was discretized by rounding down the time for each measurement. That resulted in 23 time instances (year 0 until year 22) and a lot of missing data since many subjects return, on average, around every two years (81.8% missingness Figure \@ref(fig:Missingness)). Changing the time scale to $\{0, 2, 4, ..., 22\}$ yields only 12 time instances and decreases missingness to `r round(100*missingperc,2)`% and the missingness comes closer to monotone missingness.
 
+The sensitivity analysis using NARFCS may also be improved upon with the input of practitioners. Additionally, many other MNAR sensitivity analyses exist and may yield different insights.
 
 # Bibliography
 
