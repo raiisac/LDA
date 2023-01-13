@@ -514,9 +514,9 @@ First we specify the weights by using the inverse dropout probability methodolog
 It should be noted that we created a dummy variable for each period in the TIME variable with the first being $TIME=0$ and the last $TIME=22$. There are certain periods (e.g. $TIME=1,3$) with very few observations. We specified the dummy variables with the hope of capturing any such effects. The model above had the best performance in terms of AIC. \newline After specifying the weights, we proceed with model selection of the Weighted GEE. For this purpose, we use QIC and a greedy methodology. Starting from a fully specified model we remove redundant variables from the model until we cannot simplify the model any more without sacrificing performance. The final model we chose contains the variables $$age + TIME + age^2+ age*TIME$$ As a final step we explore the correlation structure of the model using the QICu. The best performing is an independent correlation structure. The model coefficients as well as its error can be seen in the table bellow. We note that the variable $age$ is not significant but we nevertheless include it as $age^2$ is significant. Further we note that this model is almost the same as the best performing model for the normal un-weighted GEE, the only difference being that the later also includes the learning effect dummy variable for the first observation.
 
 ```{r include=FALSE}
-data_grid<- data_grid %>% mutate("R_int"=1-as.numeric(data_grid$R))
-data_grid<- data_grid[order(data_grid$id, data_grid$TIME_discrete),]
-glmweight<-glm(R_int ~ as.factor(TIME_discrete)  + side + age_scale, data = data_grid, family = "binomial")
+data_grid <- data_grid %>% mutate("R_int"=1-as.numeric(data_grid$R))
+data_grid <- data_grid[order(data_grid$id, data_grid$TIME_discrete),]
+glmweight <-glm(R_int ~ as.factor(TIME_discrete)  + side + age_scale, data = data_grid, family = "binomial")
 summary(glmweight)
 
 wgee3 <- geeglm(y ~ age+TIME_discrete+age:TIME_discrete + I(age^2), 
@@ -556,105 +556,106 @@ W=\frac{1}{M} \sum_{k=1}^M U^k \text { and } B=\frac{1}{M-1} \sum_{k=1}^M\left(\
 $$ here, $W$ measures the within-imputation variability and $B$ measures the between-imputation variability. The between-imputation variability is much larger, and it decreases if we reduce the number of imputed values.
 
 ```{r include=FALSE, cache = TRUE}
-df<-data.frame("Intercept"=rep(NA,80),
-               "Intercept_var"=rep(NA,80),
-               "age"=rep(NA,80),
-               "age_var"=rep(NA,80),
-               "TIME_discrete"=rep(NA,80),
-               "TIME_discrete_var"=rep(NA,80),
-               "age_sqrd"=rep(NA,80),
-               "age_sqrd_var"=rep(NA,80),
-               "age_TIME"=rep(NA,80),
-               "age_TIME_var"=rep(NA,80),
-               "learning"=rep(NA,80),
-               "learning_var"=rep(NA,80),
-               "resid"=rep(NA,80))
+df <- data.frame("Intercept" = rep(NA, 80),
+               "Intercept_var" = rep(NA, 80),
+               "age" = rep(NA, 80),
+               "age_var" = rep(NA, 80),
+               "TIME_discrete" = rep(NA, 80),
+               "TIME_discrete_var" = rep(NA, 80),
+               "age_sqrd" = rep(NA, 80),
+               "age_sqrd_var" = rep(NA, 80),
+               "age_TIME" = rep(NA, 80),
+               "age_TIME_var" = rep(NA, 80),
+               "learning" = rep(NA, 80),
+               "learning_var" = rep(NA, 80),
+               "resid" = rep(NA, 80))
 
 for (i in 1:20) {
-  mf<-as.formula(paste(colnames(data_imp_mean[7+i]),"~ age+TIME_discrete +age:TIME_discrete+ I(age^2)")) #+learninh
+  mf <- as.formula(paste(colnames(data_imp_mean[7 + i]),
+                         "~ age+TIME_discrete +age:TIME_discrete+ I(age^2)")) #+learninh
   gee1 <- geeglm(mf, 
-                 data=data_imp_mean, 
-                 id=id,
+                 data = data_imp_mean, 
+                 id = id,
                  family = "gaussian",
-                 corstr="independence")
+                 corstr = "independence")
   
-  df[i,1]<-summary(gee1)[["coefficients"]][[1]][[1]]
-  df[i,2]<-summary(gee1)[["coefficients"]][[2]][[1]]^2
-  df[i,3]<-summary(gee1)[["coefficients"]][[1]][[2]]
-  df[i,4]<-summary(gee1)[["coefficients"]][[2]][[2]]^2
-  df[i,5]<-summary(gee1)[["coefficients"]][[1]][[3]]
-  df[i,6]<-summary(gee1)[["coefficients"]][[2]][[3]]^2
-  df[i,7]<-summary(gee1)[["coefficients"]][[1]][[4]]
-  df[i,8]<-summary(gee1)[["coefficients"]][[2]][[4]]^2
-  df[i,9]<-summary(gee1)[["coefficients"]][[1]][[5]]
-  df[i,10]<-summary(gee1)[["coefficients"]][[2]][[5]]^2
+  df[i,1] <- summary(gee1)[["coefficients"]][[1]][[1]]
+  df[i,2] <- summary(gee1)[["coefficients"]][[2]][[1]]^2
+  df[i,3] <- summary(gee1)[["coefficients"]][[1]][[2]]
+  df[i,4] <- summary(gee1)[["coefficients"]][[2]][[2]]^2
+  df[i,5] <- summary(gee1)[["coefficients"]][[1]][[3]]
+  df[i,6] <- summary(gee1)[["coefficients"]][[2]][[3]]^2
+  df[i,7] <- summary(gee1)[["coefficients"]][[1]][[4]]
+  df[i,8] <- summary(gee1)[["coefficients"]][[2]][[4]]^2
+  df[i,9] <- summary(gee1)[["coefficients"]][[1]][[5]]
+  df[i,10] <- summary(gee1)[["coefficients"]][[2]][[5]]^2
   #df[i,11]<-summary(gee1)[["coefficients"]][[1]][[6]]
   #df[i,12]<-summary(gee1)[["coefficients"]][[2]][[6]]^2
   #df[i,13]<-mean(sqrt(resid(gee1)^2))
-  df[i,13]<-mean(na.omit(sqrt(resid(gee1)[!is.na(data_grid$y)]^2)))
+  df[i,13] <- mean(na.omit(sqrt(resid(gee1)[!is.na(data_grid$y)]^2)))
     
   gee2 <- geeglm(mf, 
-                 data=data_imp_norm, 
-                 id=id,
+                 data = data_imp_norm, 
+                 id = id,
                  family = "gaussian",
-                 corstr="independence")
-  j<-i+20
-  df[j,1]<-summary(gee2)[["coefficients"]][[1]][[1]]
-  df[j,2]<-summary(gee2)[["coefficients"]][[2]][[1]]^2
-  df[j,3]<-summary(gee2)[["coefficients"]][[1]][[2]]
-  df[j,4]<-summary(gee2)[["coefficients"]][[2]][[2]]^2
-  df[j,5]<-summary(gee2)[["coefficients"]][[1]][[3]]
-  df[j,6]<-summary(gee2)[["coefficients"]][[2]][[3]]^2
-  df[j,7]<-summary(gee2)[["coefficients"]][[1]][[4]]
-  df[j,8]<-summary(gee2)[["coefficients"]][[2]][[4]]^2
-  df[j,9]<-summary(gee2)[["coefficients"]][[1]][[5]]
-  df[j,10]<-summary(gee2)[["coefficients"]][[2]][[5]]^2
+                 corstr = "independence")
+  j <- i + 20
+  df[j,1] <- summary(gee2)[["coefficients"]][[1]][[1]]
+  df[j,2] <- summary(gee2)[["coefficients"]][[2]][[1]]^2
+  df[j,3] <- summary(gee2)[["coefficients"]][[1]][[2]]
+  df[j,4] <- summary(gee2)[["coefficients"]][[2]][[2]]^2
+  df[j,5] <- summary(gee2)[["coefficients"]][[1]][[3]]
+  df[j,6] <- summary(gee2)[["coefficients"]][[2]][[3]]^2
+  df[j,7] <- summary(gee2)[["coefficients"]][[1]][[4]]
+  df[j,8] <- summary(gee2)[["coefficients"]][[2]][[4]]^2
+  df[j,9] <- summary(gee2)[["coefficients"]][[1]][[5]]
+  df[j,10] <- summary(gee2)[["coefficients"]][[2]][[5]]^2
   #df[j,11]<-summary(gee2)[["coefficients"]][[1]][[6]]
   #df[j,12]<-summary(gee2)[["coefficients"]][[2]][[6]]^2
   #df[j,13]<-mean(na.omit(sqrt(resid(gee2)[!is.na(data_grid$y)]^2)))
-  df[j,13]<-mean(sqrt(resid(gee2)^2))
+  df[j,13] <- mean(sqrt(resid(gee2)^2))
   
   gee3 <- geeglm(mf, 
-                 data=data_imp_pmm, 
-                 id=id,
+                 data = data_imp_pmm, 
+                 id = id,
                  family = "gaussian",
-                 corstr="independence")
-  k<-i+40
-  df[k,1]<-summary(gee3)[["coefficients"]][[1]][[1]]
-  df[k,2]<-summary(gee3)[["coefficients"]][[2]][[1]]^2
-  df[k,3]<-summary(gee3)[["coefficients"]][[1]][[2]]
-  df[k,4]<-summary(gee3)[["coefficients"]][[2]][[2]]^2
-  df[k,5]<-summary(gee3)[["coefficients"]][[1]][[3]]
-  df[k,6]<-summary(gee3)[["coefficients"]][[2]][[3]]^2
-  df[k,7]<-summary(gee3)[["coefficients"]][[1]][[4]]
-  df[k,8]<-summary(gee3)[["coefficients"]][[2]][[4]]^2
-  df[k,9]<-summary(gee3)[["coefficients"]][[1]][[5]]
-  df[k,10]<-summary(gee3)[["coefficients"]][[2]][[5]]^2
+                 corstr = "independence")
+  k <- i + 40
+  df[k,1] <- summary(gee3)[["coefficients"]][[1]][[1]]
+  df[k,2] <- summary(gee3)[["coefficients"]][[2]][[1]]^2
+  df[k,3] <- summary(gee3)[["coefficients"]][[1]][[2]]
+  df[k,4] <- summary(gee3)[["coefficients"]][[2]][[2]]^2
+  df[k,5] <- summary(gee3)[["coefficients"]][[1]][[3]]
+  df[k,6] <- summary(gee3)[["coefficients"]][[2]][[3]]^2
+  df[k,7] <- summary(gee3)[["coefficients"]][[1]][[4]]
+  df[k,8] <- summary(gee3)[["coefficients"]][[2]][[4]]^2
+  df[k,9] <- summary(gee3)[["coefficients"]][[1]][[5]]
+  df[k,10] <- summary(gee3)[["coefficients"]][[2]][[5]]^2
   #df[k,11]<-summary(gee3)[["coefficients"]][[1]][[6]]
   #df[k,12]<-summary(gee3)[["coefficients"]][[2]][[6]]^2
   #df[k,13]<-mean(na.omit(sqrt(resid(gee3)[!is.na(data_grid$y)]^2)))
-  df[k,13]<-mean(sqrt(resid(gee3)^2))
+  df[k,13] <- mean(sqrt(resid(gee3)^2))
   
   gee4 <- geeglm(mf, 
-                 data=data_imp_rf, 
-                 id=id,
+                 data = data_imp_rf, 
+                 id = id,
                  family = "gaussian",
-                 corstr="independence")
-  l<-i+60
-  df[l,1]<-summary(gee4)[["coefficients"]][[1]][[1]]
-  df[l,2]<-summary(gee4)[["coefficients"]][[2]][[1]]^2
-  df[l,3]<-summary(gee4)[["coefficients"]][[1]][[2]]
-  df[l,4]<-summary(gee4)[["coefficients"]][[2]][[2]]^2
-  df[l,5]<-summary(gee4)[["coefficients"]][[1]][[3]]
-  df[l,6]<-summary(gee4)[["coefficients"]][[2]][[3]]^2
-  df[l,7]<-summary(gee4)[["coefficients"]][[1]][[4]]
-  df[l,8]<-summary(gee4)[["coefficients"]][[2]][[4]]^2
-  df[l,9]<-summary(gee4)[["coefficients"]][[1]][[5]]
-  df[l,10]<-summary(gee4)[["coefficients"]][[2]][[5]]^2
+                 corstr = "independence")
+  l <- i + 60
+  df[l,1] <- summary(gee4)[["coefficients"]][[1]][[1]]
+  df[l,2] <- summary(gee4)[["coefficients"]][[2]][[1]]^2
+  df[l,3] <- summary(gee4)[["coefficients"]][[1]][[2]]
+  df[l,4] <- summary(gee4)[["coefficients"]][[2]][[2]]^2
+  df[l,5] <- summary(gee4)[["coefficients"]][[1]][[3]]
+  df[l,6] <- summary(gee4)[["coefficients"]][[2]][[3]]^2
+  df[l,7] <- summary(gee4)[["coefficients"]][[1]][[4]]
+  df[l,8] <- summary(gee4)[["coefficients"]][[2]][[4]]^2
+  df[l,9] <- summary(gee4)[["coefficients"]][[1]][[5]]
+  df[l,10] <- summary(gee4)[["coefficients"]][[2]][[5]]^2
   #df[l,11]<-summary(gee4)[["coefficients"]][[1]][[6]]
   #df[l,12]<-summary(gee4)[["coefficients"]][[2]][[6]]^2
   #df[l,13]<-mean(na.omit(sqrt(resid(gee4)[!is.na(data_grid$y)]^2)))
-  df[l,13]<-mean(sqrt(resid(gee4)^2))
+  df[l,13] <- mean(sqrt(resid(gee4)^2))
   
 }
 
@@ -666,121 +667,132 @@ df_full <- df[row_odd == 0, ]
 
 
 
-Intercept_df<-mean(df$Intercept)
-age_df<-mean(df$age)
-TIME_discrete_df<-mean(df$TIME_discrete)
-learning_df<-mean(df$learning)
-age_sqrd_df<-mean(df$age_sqrd)
-age_TIME_df<-mean(df$age_TIME)
-learning_df<-mean(df$learning)
-residuals_mult<-mean(df$resid)
+Intercept_df <- mean(df$Intercept)
+age_df <- mean(df$age)
+TIME_discrete_df <- mean(df$TIME_discrete)
+learning_df <- mean(df$learning)
+age_sqrd_df <- mean(df$age_sqrd)
+age_TIME_df <- mean(df$age_TIME)
+learning_df <- mean(df$learning)
+residuals_mult <- mean(df$resid)
 
 
-Intercept_df_var<-mean(df$Intercept_var)+(81/80)*var(df$Intercept)
-age_df_var<-mean(df$age_var)+(81/80)*var(df$age)
-TIME_discrete_df_var<-mean(df$TIME_discrete_var)+(81/80)*var(df$TIME_discrete)
-age_sqrd_df_var<-mean(df$age_sqrd_var)+(81/80)*var(df$age_sqrd)
-age_TIME_df_var<-mean(df$age_TIME_var)+(81/80)*var(df$age_TIME)
-learning_df_var<-mean(df$learning_var)+(81/80)*var(df$learning_var)
+Intercept_df_var <- mean(df$Intercept_var) + (81/80) * var(df$Intercept)
+age_df_var <- mean(df$age_var) + (81/80) * var(df$age)
+TIME_discrete_df_var <- mean(df$TIME_discrete_var) + (81/80) *
+  var(df$TIME_discrete)
+age_sqrd_df_var <- mean(df$age_sqrd_var) + (81/80) * var(df$age_sqrd)
+age_TIME_df_var <- mean(df$age_TIME_var) + (81/80) * var(df$age_TIME)
+learning_df_var <- mean(df$learning_var) + (81/80) * var(df$learning_var)
 
-d2<-d
-d2[1,1]<-Intercept_df
-d2[1,2]<-sqrt(Intercept_df_var)
-d2[2,1]<-age_df
-d2[2,2]<-sqrt(age_df_var)
-d2[3,1]<-TIME_discrete_df
-d2[3,2]<-sqrt(TIME_discrete_df_var)
-d2[4,1]<-age_sqrd_df
-d2[4,2]<-sqrt(age_sqrd_df_var)
+d2 <- d
+d2[1,1] <- Intercept_df
+d2[1,2] <- sqrt(Intercept_df_var)
+d2[2,1] <- age_df
+d2[2,2] <- sqrt(age_df_var)
+d2[3,1] <- TIME_discrete_df
+d2[3,2] <- sqrt(TIME_discrete_df_var)
+d2[4,1] <- age_sqrd_df
+d2[4,2] <- sqrt(age_sqrd_df_var)
 #d2[5,1]<-learning_df
 #d2[5,2]<-sqrt(learning_df_var)
-d2[5,1]<-age_TIME_df
-d2[5,2]<-sqrt(age_TIME_df_var)
+d2[5,1] <- age_TIME_df
+d2[5,2] <- sqrt(age_TIME_df_var)
 
-d2<-d2 %>% 
-  mutate(across(where(is.numeric), round, digits=3))
+d2 <- d2 %>% 
+  mutate(across(where(is.numeric), round, digits = 3))
 
-d2[6,]<-c("RMSE",round(residuals_mult,3))
-row.names(d2)[6]<-" "
+d2[6,] <- c("RMSE", round(residuals_mult, 3))
+row.names(d2)[6] <- " "
 
 
 
-Intercept_mon<-mean(df_monotone$Intercept)
-age_mon<-mean(df_monotone$age)
-TIME_discrete_mon<-mean(df_monotone$TIME_discrete)
-learning_mon<-mean(df_monotone$learning)
-age_sqrd_mon<-mean(df_monotone$age_sqrd)
-age_TIME_mon<-mean(df_monotone$age_TIME)
-learning_mon<-mean(df_monotone$learning)
-residuals_mult_mon<-mean(df_monotone$resid)
+Intercept_mon <- mean(df_monotone$Intercept)
+age_mon <- mean(df_monotone$age)
+TIME_discrete_mon <- mean(df_monotone$TIME_discrete)
+learning_mon <- mean(df_monotone$learning)
+age_sqrd_mon <- mean(df_monotone$age_sqrd)
+age_TIME_mon <- mean(df_monotone$age_TIME)
+learning_mon <- mean(df_monotone$learning)
+residuals_mult_mon <- mean(df_monotone$resid)
 
-Intercept_df_var_mon<-mean(df_monotone$Intercept_var)+(41/40)*var(df_monotone$Intercept)
-age_df_var_mon<-mean(df_monotone$age_var)+(41/40)*var(df_monotone$age)
-TIME_discrete_df_var_mon<-mean(df_monotone$TIME_discrete_var)+(41/40)*var(df_monotone$TIME_discrete)
-age_sqrd_df_var_mon<-mean(df_monotone$age_sqrd_var)+(41/40)*var(df_monotone$age_sqrd)
-age_TIME_df_var_mon<-mean(df_monotone$age_TIME_var)+(41/40)*var(df_monotone$age_TIME)
-learning_df_var_mon<-mean(df_monotone$learning_var)+(41/40)*var(df_monotone$learning_var)
+Intercept_df_var_mon <- mean(df_monotone$Intercept_var) + (41/40) * 
+  var(df_monotone$Intercept)
+age_df_var_mon <- mean(df_monotone$age_var) + (41/40) * var(df_monotone$age)
+TIME_discrete_df_var_mon <- mean(df_monotone$TIME_discrete_var) + (41/40) * 
+  var(df_monotone$TIME_discrete)
+age_sqrd_df_var_mon <- mean(df_monotone$age_sqrd_var) + (41/40) * 
+  var(df_monotone$age_sqrd)
+age_TIME_df_var_mon <- mean(df_monotone$age_TIME_var) + (41/40) *
+  var(df_monotone$age_TIME)
+learning_df_var_mon <- mean(df_monotone$learning_var) + (41/40) *
+  var(df_monotone$learning_var)
 
-d3<-d
-d3[1,1]<-Intercept_mon
-d3[1,2]<-sqrt(Intercept_df_var_mon)
-d3[2,1]<-age_mon
-d3[2,2]<-sqrt(age_df_var_mon)
-d3[3,1]<-TIME_discrete_mon
-d3[3,2]<-sqrt(TIME_discrete_df_var_mon)
-d3[4,1]<-age_sqrd_mon
-d3[4,2]<-sqrt(age_sqrd_df_var_mon)
+d3 <- d
+d3[1,1] <- Intercept_mon
+d3[1,2] <- sqrt(Intercept_df_var_mon)
+d3[2,1] <- age_mon
+d3[2,2] <- sqrt(age_df_var_mon)
+d3[3,1] <- TIME_discrete_mon
+d3[3,2] <- sqrt(TIME_discrete_df_var_mon)
+d3[4,1] <- age_sqrd_mon
+d3[4,2] <- sqrt(age_sqrd_df_var_mon)
 #d3[5,1]<-learning_mon
 #d3[5,2]<-sqrt(learning_df_var_mon)
-d3[5,1]<-age_TIME_mon
-d3[5,2]<-sqrt(age_TIME_df_var_mon)
+d3[5,1] <- age_TIME_mon
+d3[5,2] <- sqrt(age_TIME_df_var_mon)
 
 
-d3<-d3 %>% 
-  mutate(across(where(is.numeric), round, digits=3))
+d3 <- d3 %>% 
+  mutate(across(where(is.numeric), round, digits = 3))
 
-d3[6,]<-c("RMSE",round(residuals_mult_mon,3))
-row.names(d3)[6]<-" "
+d3[6,] <- c("RMSE", round(residuals_mult_mon, 3))
+row.names(d3)[6] <- " "
 
-Intercept_full<-mean(df_full$Intercept)
-age_full<-mean(df_full$age)
-TIME_discrete_full<-mean(df_full$TIME_discrete)
-learning_full<-mean(df_full$learning)
-age_sqrd_full<-mean(df_full$age_sqrd)
-age_TIME_full<-mean(df_full$age_TIME)
-learning_full<-mean(df_monotone$learning)
-residuals_mult_full<-mean(df_full$resid)
+Intercept_full <- mean(df_full$Intercept)
+age_full <- mean(df_full$age)
+TIME_discrete_full <- mean(df_full$TIME_discrete)
+learning_full <- mean(df_full$learning)
+age_sqrd_full <- mean(df_full$age_sqrd)
+age_TIME_full <- mean(df_full$age_TIME)
+learning_full <- mean(df_monotone$learning)
+residuals_mult_full <- mean(df_full$resid)
 
-Intercept_df_var_full<-mean(df_full$Intercept_var)+(41/40)*var(df_full$Intercept)
-age_df_var_full<-mean(df_full$age_var)+(41/40)*var(df_full$age)
-TIME_discrete_df_var_full<-mean(df_full$TIME_discrete_var)+(41/40)*var(df_full$TIME_discrete)
-age_sqrd_df_var_full<-mean(df_full$age_sqrd_var)+(41/40)*var(df_full$age_sqrd)
-age_TIME_df_var_full<-mean(df_full$age_TIME_var)+(41/40)*var(df_full$age_TIME)
-learning_df_var_full<-mean(df_full$learning_var)+(41/40)*var(df_full$learning_var)
+Intercept_df_var_full <- mean(df_full$Intercept_var) + (41/40) *
+  var(df_full$Intercept)
+age_df_var_full <- mean(df_full$age_var) + (41/40) * var(df_full$age)
+TIME_discrete_df_var_full <- mean(df_full$TIME_discrete_var) + (41/40) * 
+  var(df_full$TIME_discrete)
+age_sqrd_df_var_full <- mean(df_full$age_sqrd_var) + (41/40) * 
+  var(df_full$age_sqrd)
+age_TIME_df_var_full <- mean(df_full$age_TIME_var) + (41/40) *
+  var(df_full$age_TIME)
+learning_df_var_full <- mean(df_full$learning_var) + (41/40) * 
+  var(df_full$learning_var)
 
-d4<-d
-d4[1,1]<-Intercept_full
-d4[1,2]<-sqrt(Intercept_df_var_full)
-d4[2,1]<-age_full
-d4[2,2]<-sqrt(age_df_var_full)
-d4[3,1]<-TIME_discrete_full
-d4[3,2]<-sqrt(TIME_discrete_df_var_full)
-d4[4,1]<-age_sqrd_full
-d4[4,2]<-sqrt(age_sqrd_df_var_full)
+d4 <- d
+d4[1,1] <- Intercept_full
+d4[1,2] <- sqrt(Intercept_df_var_full)
+d4[2,1] <- age_full
+d4[2,2] <- sqrt(age_df_var_full)
+d4[3,1] <- TIME_discrete_full
+d4[3,2] <- sqrt(TIME_discrete_df_var_full)
+d4[4,1] <- age_sqrd_full
+d4[4,2] <- sqrt(age_sqrd_df_var_full)
 #d4[5,1]<-learning_full
 #d4[5,2]<-sqrt(learning_df_var_full)
-d4[5,1]<-age_TIME_full
-d4[5,2]<-sqrt(age_TIME_df_var_full)
+d4[5,1] <- age_TIME_full
+d4[5,2] <- sqrt(age_TIME_df_var_full)
 
-d4<-d4 %>% 
-  mutate(across(where(is.numeric), round, digits=3))
+d4 <- d4 %>% 
+  mutate(across(where(is.numeric), round, digits = 3))
 
-d4[6,]<-c("RMSE",round(residuals_mult_full,3))
-row.names(d4)[6]<-" "
+d4[6,] <- c("RMSE", round(residuals_mult_full, 3))
+row.names(d4)[6] <- " "
 
-d5<-cbind(d1,d2,d3,d4)
-d6<-cbind(rownames(d5),d5)
-colnames(d6)[1]<-""
+d5 <- cbind(d1, d2, d3, d4)
+d6 <- cbind(rownames(d5), d5)
+colnames(d6)[1] <- ""
 #d6<-d6[-5,]
 
 
@@ -1334,7 +1346,70 @@ In practice, it is suggested that the sensitivity parameters ($\delta$'s) are di
   - A shift in the effect of age $\delta_{Yage} \in \{-1; -0.5;0;0.5;1\}$. 
   - A shift in the effect of time $\delta_{Ytime} \in \{-1; -0.5;0;0.5;1\}$. 
 
-In each of the 125 (5*5*5) scenarios, We will impute the data ten times and will fit a GEE model on the imputed data. Final results in each scenario are then obtained using the same methodology as in section 3.2.2. 
+In each of the 125 (5*5*5) scenarios, We will impute the data ten times and will fit a GEE model with a simple correlation structure on the imputed data. Final results in each scenario are then obtained using the same methodology as in section 3.2.2. 
+
+```{r echo=FALSE, eval=!file.exists("data/resultssensitivitywithlearning.Rdata")}
+getimputationsummary <- function(data, intercept, deltaage, deltatime, formula, predSens, sensFormula, m){
+  nbobs = nrow(data) #nb observation 
+  sensFormula <- sprintf("%.1f%+.1f*TIME_discrete%+.1f*age", 
+                             intercept, deltaage, deltatime)
+   mnar.blot <- list(y = list(ums = sensFormula))
+    imputation <- mice(data, m = m,
+               method = c("mnar.norm", "", "", "", "", "", ""),
+               predictorMatrix = formula,
+               predictorSens = predSens,
+               blots = mnar.blot, 
+               seed = 234235, print = FALSE
+               )
+    fit <- with(imputation, 
+                 geeglm(y ~ age + TIME_discrete + age:TIME_discrete + I(age^2) + learning, 
+                 id = id,
+                 family = "gaussian",
+                 corstr = "independence"))
+    res <- summary(pool(fit,
+                 rule = "rubin1987")) %>%
+      mutate(intercept = intercept,
+             deltaage = deltaage,
+             deltatime = deltatime,
+             lb = estimate + qt(p = .025, df = df)*std.error,
+             ub = estimate + qt(p = .975, df = df)*std.error)
+    return(res)
+}
+
+filtereddata <- data_grid %>%
+  dplyr::select(y, TIME_discrete, age, id, learning) %>%
+  mutate(age2 = age*age,
+         timeage = TIME_discrete*age)
+#Set-up predictor matrix for identifiable part
+predMatrix <- matrix(rep(0, ncol(filtereddata) * ncol(filtereddata)), 
+                     ncol = ncol(filtereddata))
+colnames(predMatrix) <- rownames(predMatrix) <- names(filtereddata)
+predMatrix["y",] <- c(0, 1, 1, 0, 1, 1, 1)#we're only predicting y with everything except id
+
+predSens <- matrix(rep(0, ncol(filtereddata) * ncol(filtereddata)), 
+                   ncol = ncol(filtereddata))
+colnames(predSens) <- paste(":", names(filtereddata), sep = "")
+rownames(predSens) <- names(filtereddata)
+predSens["y",] <- c(0, 1, 1, 0, 0, 0, 0)# we also want to use time and age to predict the unobserved part.
+results <- data.frame()
+for (intercept in c(-5, -2, 0, 2, 5)) {
+  for (deltaage in c(-1, -0.5, 0, 0.5, 1)) {
+    for (deltatime in c(-1, -0.5, 0, 0.5, 1)) {
+      res <- getimputationsummary(data = filtereddata,
+                           intercept = intercept, 
+                           deltaage = deltaage, 
+                           deltatime = deltatime, 
+                           formula = predMatrix,#the observable part
+                           predSens = predSens,
+                           sensFormula = sensFormula, #unobservable part
+                           m = 10)
+      results <- rbind(results,res)
+    }
+  }
+}
+
+save(results, file = "data/resultssensitivitywithlearning.Rdata")
+```
 
 ```{r echo=FALSE, eval=!file.exists("data/resultssensitivity.Rdata")}
 getimputationsummary <- function(data, intercept, deltaage, deltatime, formula, predSens, sensFormula, m){
@@ -1350,8 +1425,8 @@ getimputationsummary <- function(data, intercept, deltaage, deltatime, formula, 
                seed = 234235, print = FALSE
                )
     fit <- with(imputation, 
-                 geeglm(y~ age+TIME_discrete +age:TIME_discrete+ I(age^2), 
-                 id=id,
+                 geeglm(y~ age + TIME_discrete + age:TIME_discrete + I(age^2), 
+                 id = id,
                  family = "gaussian",
                  corstr = "independence"))
     res <- summary(pool(fit,
@@ -1401,7 +1476,7 @@ save(results, file = "data/resultssensitivity.Rdata")
 
 
 ```{r echo=FALSE, eval=file.exists("data/resultssensitivity.Rdata")}
-load("data/resultssensitivity.Rdata")
+load("data/resultssensitivitywithlearning.Rdata")
 ```
 
 ```{r resultsintercept, echo=FALSE, fig.cap="Sensitivity analysis of the effect on the estimated intercept and the 95 percent confidence intervals. The rows show different values for deltage. The columns show different values for deltatime. The confidence intervals are less bright if the confidence interval entails zero.", fig.width = 8, fig.height = 8}
@@ -1435,7 +1510,7 @@ results %>% filter(term == "(Intercept)") %>%
 
 ```{r resultssens,echo=FALSE, fig.cap="Sensitivity analysis of the effect on all parameter estimates, except for the intercept. The rows show different values for deltage. The columns show different values for deltatime. The 95 percent confidence intervals are less bright if the confidence interval entails zero." , fig.width = 8, fig.height = 8}
 results %>% filter(term != "(Intercept)") %>%
-  mutate(term = str_remove(term, "_discrete"),
+  mutate(term = str_remove(str_remove(term, "_discrete"),"TRUE"),
          significant = (p.value < 0.05)) %>%
   ggplot() +
   geom_line(aes(x=intercept, y = estimate, color = term)) +
@@ -1445,7 +1520,8 @@ results %>% filter(term != "(Intercept)") %>%
                     alpha = significant), 
                 position = position_dodge(0.1)) +
   geom_hline(aes(yintercept = 0)) + 
-  facet_grid(deltaage ~ deltatime,
+  facet_grid(rows = vars(deltaage),
+             cols = vars(deltatime),
              labeller = labeller(
                .rows = as_labeller(appenderage,
                                    default = label_parsed),
@@ -1468,19 +1544,20 @@ Figure \@ref(fig:resultsintercept) shows the estimated intercepts and \@ref(fig:
 
 A shift in the intercept for imputed data ($\delta_{Y0}$) of 1 dB results in an almost equal shift in the estimated intercept from the gee model (`r round(mean(unlist(interceptchange[interceptchange$term == "(Intercept)","diffintercept"]))/10,2)` dB). This was expected because such a large part of the data is imputed. It is, however, more interesting to look at the other parameter estimates. Figure \@ref(fig:resultssens2) shows the effects on the different variables even clearer. 
 
-The parameter estimate for age is usually negative, except when $\delta_{Ytime}$ and $\delta_{Yage}$ are very negative. The interaction effect between time and age is always positive when $\delta_{Y0} >=0$ and negative or insignificant if $\delta_{Y0}<0$. The parameter estimate for $age^2$ is usually positive, unless all three $\delta$'s become negative. The parameter does not seem very impacted by $\delta_{Ytime}$ or $\delta_{Y0}$ but it is very sensitive to changes in $\delta_{Yage}$.
+The parameter estimate for age is usually negative, except when $\delta_{Y0}$, $\delta_{Ytime}$ and $\delta_{Yage}$ are all very negative. The interaction effect between time and age is always positive when $\delta_{Y0} >=0$ and negative or insignificant if $\delta_{Y0}<0$. The parameter estimate for $age^2$ is usually positive, unless all three $\delta$'s become negative. The learning effect is the largest of all and it is mainly impacted by $\delta_{Y0}$. The parameter estimate for TIME does not seem very impacted by $\delta_{Ytime}$ or $\delta_{Y0}$ but it is very sensitive to changes in $\delta_{Yage}$.
 
 ```{r resultssens2,echo=FALSE, fig.cap= "Heatmap for all parameter estimates, except for the intercept. The rows show the different parameters (covariates). The columns show different values for deltatime." , fig.width = 8, fig.height = 8}
 results %>% filter(term != "(Intercept)") %>%
-  mutate(term = str_remove(term, "_discrete"),
+  mutate(term = str_remove(str_remove(term, "_discrete"),"TRUE"),
          significant = (p.value < 0.05),
          color = ifelse(significant,
                         ifelse(estimate>0, "positive","negative"),
                         "not significant")) %>%
   ggplot() +
-  geom_tile(aes(color = color, fill = color, alpha = estimate, x = intercept, y= deltaage)) +
+  geom_tile(aes(color = color, fill = color, alpha = abs(estimate), x = intercept, y= deltaage)) +
   geom_hline(aes(yintercept = 0)) + 
-  facet_grid(term ~ deltatime,
+  facet_grid(rows = vars(term),
+             cols = vars(deltatime),,
              labeller = labeller(
                .cols = as_labeller(appendertime, 
                                    default = label_parsed))) + 
