@@ -1561,7 +1561,6 @@ results %>% filter(term != "(Intercept)") %>%
   ggplot() +
   geom_tile(aes(color = color, fill = color, alpha = abs(estimate), 
                 x = intercept, y = deltaage)) +
-  geom_hline(aes(yintercept = 0)) + 
   facet_grid(rows = vars(term),
              cols = vars(deltatime),,
              labeller = labeller(
@@ -1585,7 +1584,6 @@ Both direct likelihood methods and general estimating equations with and without
 
 Any violation of MAR may have a significant impact on the model estimates, as shown in the sensitivity analysis.
 
-# Future research
 
 ```{r include = FALSE}
 #calculate missingness if time scale is every two years
@@ -1602,7 +1600,7 @@ missingperc <- sum(is.na(test$y))/nrow(test)
 #link to author paper prof molenberghs
 #https://documentserver.uhasselt.be/bitstream/1942/33320/2/CIS-MI-MLR-2020.09.22.09.00.pdf
 ```
-It might be useful to replicated the current analysis but with a coarser time frame. In this report, time was discretized by rounding down the time for each measurement. That resulted in 23 time instances (year 0 until year 22) and a lot of missing data since many subjects return, on average, around every two years (81.8% missingness Figure \@ref(fig:Missingness)). Changing the time scale to $\{0, 2, 4, ..., 22\}$ yields only 12 time instances and decreases missingness to `r round(100*missingperc,2)`% and the missingness comes closer to monotone missingness.
+For future research, it might be useful to replicated the current analysis but with a coarser time frame. In this report, time was discretized by rounding down the time for each measurement. That resulted in 23 time instances (year 0 until year 22) and a lot of missing data since many subjects return, on average, around every two years (81.8% missingness Figure \@ref(fig:Missingness)). Changing the time scale to $\{0, 2, 4, ..., 22\}$ yields only 12 time instances, it decreases missingness to `r round(100*missingperc,2)`%, and the missingness comes closer to monotone missingness.
 
 The sensitivity analysis using NARFCS may also be improved upon because there exist many other MNAR sensitivity analyses that may yield different insights [see for instance @uranga2022multiple ; @de2017comparison]. A downside of NARFCS, for instance, is that the sensitivity parameters are conditional parameters. THey represent differences in the distribution of the observed and missing values of each variable, *conditional* on the other variables, and *conditional* on the missingness indicators of the other variables. These parameters are therefor essentially impossible to elicit directly from experts, and differs from the marginal difference between the observed and missing values for the variable. This means that choosing values for the conditional sensitivity parameters involved in NARFCS is tricky.
 
