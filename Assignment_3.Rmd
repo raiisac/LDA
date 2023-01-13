@@ -191,12 +191,11 @@ s$coefficients %>% as.data.frame() %>%
 # Methodology
 
 First, a direct likelihood analysis is compared with multiple imputation in the continuous case. 
-Next, weighted generalized estimating equations are compared with ‘multiple-imputation generalized estimating equations’. 
-Lastly, a sensitivity analysis is performed.
+Next, weighted generalized estimating equations are compared with ‘multiple-imputation generalized estimating equations’, using the *geepack* package [@hojsgaard2016package].
 
-For imputation, the *mice* library is used [@JSSv045i03] and different imputation techniques were tested: Predictive mean matching, Bayesian linear regression, Unconditional mean imputation, and imputation by random forests. 
+For imputation, the *mice* library is used [@JSSv045i03] and different imputation techniques were tested: Predictive mean matching, Bayesian linear regression, Unconditional mean imputation, and imputation by random forests. For the MNAR sensitivity analysis, the NARFCS algorithm in the same package is used.
 
-All analysis was done in R. All scripts are freely available at [this git repository](https://github.com/raiisac/LDA). 
+All analysis was done in R, data wrangling and figures were made with the *tidyverse* package [@wickham2017package]. All scripts are freely available at [$\text{\underline{this git repository}}$](https://github.com/raiisac/LDA). 
 
 # Results
 
@@ -1332,21 +1331,27 @@ In Table \@ref(tab:GEEMImonotone) and \@ref(tab:GEEMIfull), we compare the monot
 
 ## Sensitivity analysis
 
-In the previous sections, some sensitivity analysis was done with respect to the different possible imputation methods. Usually, the model results were quite stable. However, all of the previous models assume MAR. In this section, we explore whether the results are robust if the MAR assumption is not realistic and the missingness is not at random (MNAR). Whether or not there is MAR or MNAR cannot be easily and directly tested since we can never know for sure what the hearing threshold would have been if it is missing [@verbeke2001sensitivity; @van2001local]. It is likely that different assumption on the missingness mechanism will lead to different conclusions, especially if the dropout is higher than 10% [@10.3389/fpsyg.2017.00722]. The dropout/missingness is much higher in our dataset and, results are thus expected to be highly impacted.
+In the previous sections, some sensitivity analysis was done with respect to the different possible imputation methods. Usually, the model results were quite stable. However, all of the previous models assume MAR. In this section, we explore whether the results are robust if the MAR assumption is not realistic and the missingness is not at random (MNAR). Whether or not there is MAR or MNAR cannot be easily and directly tested since we can never know for sure what the hearing threshold would have been if it is missing [@verbeke2001sensitivity; @van2001local]. It is likely that different assumption on the missingness mechanism will lead to different conclusions, especially if the dropout is higher than 10% [@10.3389/fpsyg.2017.00722]. The dropout/missingness is much higher in our dataset and results are thus expected to be highly impacted.
 
-We use imputation under a MNAR mechanism by the not at random fully conditional specification (NARFCS) procedure [see @tompsett2018use and [this useful vignette]{https://github.com/moreno-betancur/NARFCS/blob/master/Vignette.md}]. This method works, even is the missingness is not monotone, and allows us to test the effect of different shifts in the MNAR imputed values on the model coefficients. These shifts may also depend on other covariates (such as age and time, see the unidentifiable part in the equation below). Notice that the unidentifiable part will only come into play when an observation is missing ($R_y=1$). More concretely, The imputed values are of the following form:
+We use imputation under a MNAR mechanism by the *not at random fully conditional specification* (NARFCS) procedure as described in @tompsett2018use and [$\text{\underline{this useful vignette}}$](https://github.com/moreno-betancur/NARFCS/blob/master/Vignette.md). This method works, even if the missingness is not monotone, and allows us to test the effect of different shifts in the MNAR imputed values on the model coefficients. These shifts may also depend on other covariates (such as age and time, see the unidentifiable part in the equation below). Notice that the unidentifiable part will only come into play when an observation is missing ($R_y=1$). More concretely, The imputed values are of the following form:
 
 \begin{align} 
 {E(Y|X,R_Y)} =&\underbrace{\beta_{Y0}+ \beta_{Yage} age + \beta_{Yage2} age^2 + \beta_{Ytime} TIME + \beta_{Ytimeage} TIME:age}_\text{IDENTIFIABLE PART}\ \\&+\underbrace{R_Y(\delta_{Y0}+\delta_{Yage} age+\delta_{Yage2} age^2 + \delta_{Ytime} TIME + \delta_{Ytimeage} TIME:age)}_\text{UNIDENTIFIABLE PART}. 
 \end{align}
 
-In practice, it is suggested that the sensitivity parameters ($\delta$'s) are discussed and chosen with practitioners. For instance, in the hypothetical case that people were asked not let their hearing be measured when they have a cold, the hearing threshold might be higher if the data is missing and practitioners may have some intuition as to how much higher. It should be noted that eliciting these parameters can betricky because they are *conditional* on all other parameters (see also section 5). Here, we don't have any information from practitioners and implement the following shifts as an illustration:
+In practice, it is suggested that the sensitivity parameters ($\delta$'s) are discussed and chosen with practitioners. For instance, in the hypothetical case that people were asked not to skip a visit if they have a cold, the hearing threshold might be higher if the data is missing and practitioners may have some intuition as to how much higher. It should be noted that eliciting these parameters can be tricky because they are *conditional* on all other parameters (see also section 5). Here, we don't have any information from practitioners and implement the following shifts as an illustration:
 
   - A shift in the intercept: $\delta_{Y0} \in \{-5; -2;0;2;5\}$. This means that the imputation for the missing values will differ between -5 to 5 dB from expected values in MAR, on average.
   - A shift in the effect of age $\delta_{Yage} \in \{-1; -0.5;0;0.5;1\}$. 
   - A shift in the effect of time $\delta_{Ytime} \in \{-1; -0.5;0;0.5;1\}$. 
 
-In each of the 125 (5*5*5) scenarios, We will impute the data ten times and will fit a GEE model with a simple correlation structure on the imputed data. Final results in each scenario are then obtained using the same methodology as in section 3.2.2. 
+In each of the 125 ($5*5*5$) scenarios, We will impute the data ten times and will fit a GEE model with a simple correlation structure on the imputed data (equation \@ref(eq:GEEsensitivity)). Final results in each scenario are then obtained using the same methodology as in section 3.2.2. 
+\begin{equation}
+                \begin{array}{ll}
+                  Y_i = \alpha_0 + \alpha_{1}age_i +  \alpha_{2}TIME_i + \alpha_{3}learning_i + \\ \hspace{5cm} \alpha_{4}age^2_i + \alpha_{5}age_i*TIME_i 
+                \end{array}
+(\#eq:GEEsensitivity)
+\end{equation}
 
 ```{r echo=FALSE, eval=!file.exists("data/resultssensitivitywithlearning.Rdata")}
 getimputationsummary <- function(data, intercept, deltaage, deltatime, formula, predSens, sensFormula, m){
@@ -1479,13 +1484,13 @@ save(results, file = "data/resultssensitivity.Rdata")
 load("data/resultssensitivitywithlearning.Rdata")
 ```
 
-```{r resultsintercept, echo=FALSE, fig.cap="Sensitivity analysis of the effect on the estimated intercept and the 95 percent confidence intervals. The rows show different values for deltage. The columns show different values for deltatime. The confidence intervals are less bright if the confidence interval entails zero.", fig.width = 8, fig.height = 8}
+```{r resultsintercept, echo=FALSE, warning = FALSE, fig.cap = "Sensitivity analysis of the effect on the estimated intercept and the 95 percent confidence intervals. The rows show different values for deltage. The columns show different values for deltatime. The confidence intervals are less bright if the confidence interval entails zero.", fig.width = 8, fig.height = 8}
 appendertime <- function(string) 
     TeX(paste("$\\delta_{Ytime} = $", string))  
 appenderage <- function(string) 
     TeX(paste("$\\delta_{Yage} = $", string)) 
-results %>% filter(term == "(Intercept)") %>%
-  mutate(term = str_remove(term, "_discrete"),
+results %>% filter(term %in% c("learningTRUE", "(Intercept)")) %>%
+  mutate(term = str_remove(str_remove(term, "_discrete"),"TRUE"),
          significant = (p.value < 0.05)) %>%
   ggplot() +
   geom_line(aes(x = intercept, y = estimate, color = term)) +
@@ -1508,8 +1513,8 @@ results %>% filter(term == "(Intercept)") %>%
   scale_x_continuous(breaks = c(-5, -2, 0, 2, 5))
 ```
 
-```{r resultssens,echo=FALSE, fig.cap="Sensitivity analysis of the effect on all parameter estimates, except for the intercept. The rows show different values for deltage. The columns show different values for deltatime. The 95 percent confidence intervals are less bright if the confidence interval entails zero." , fig.width = 8, fig.height = 8}
-results %>% filter(term != "(Intercept)") %>%
+```{r resultssens, echo=FALSE, warning = FALSE, fig.cap="Sensitivity analysis of the effect on all parameter estimates, except for the intercept and learning. The rows show different values for deltage. The columns show different values for deltatime. The 95 percent confidence intervals are less bright if the confidence interval entails zero." , fig.width = 8, fig.height = 8}
+results %>% filter(!(term %in% c("learningTRUE", "(Intercept)"))) %>%
   mutate(term = str_remove(str_remove(term, "_discrete"),"TRUE"),
          significant = (p.value < 0.05)) %>%
   ggplot() +
@@ -1540,11 +1545,11 @@ interceptchange <- results %>%
   ungroup()
 ```
 
-Figure \@ref(fig:resultsintercept) shows the estimated intercepts and \@ref(fig:resultssens) shows all other parameter estimates. 
+Figure \@ref(fig:resultsintercept) shows the estimated intercepts and learning coefficient and \@ref(fig:resultssens) shows all other parameter estimates. 
 
-A shift in the intercept for imputed data ($\delta_{Y0}$) of 1 dB results in an almost equal shift in the estimated intercept from the gee model (`r round(mean(unlist(interceptchange[interceptchange$term == "(Intercept)","diffintercept"]))/10,2)` dB). This was expected because such a large part of the data is imputed. It is, however, more interesting to look at the other parameter estimates. Figure \@ref(fig:resultssens2) shows the effects on the different variables even clearer. 
+A shift in the intercept for imputed data ($\delta_{Y0}$) of 1 dB results in an almost equal shift in the estimated intercept from the gee model (`r round(mean(unlist(interceptchange[interceptchange$term == "(Intercept)","diffintercept"]))/10,2)` dB). This was expected because such a large part of the data is imputed. It is, however, more interesting to look at the other parameter estimates. 
 
-The parameter estimate for age is usually negative, except when $\delta_{Y0}$, $\delta_{Ytime}$ and $\delta_{Yage}$ are all very negative. The interaction effect between time and age is always positive when $\delta_{Y0} >=0$ and negative or insignificant if $\delta_{Y0}<0$. The parameter estimate for $age^2$ is usually positive, unless all three $\delta$'s become negative. The learning effect is the largest of all and it is mainly impacted by $\delta_{Y0}$. The parameter estimate for TIME does not seem very impacted by $\delta_{Ytime}$ or $\delta_{Y0}$ but it is very sensitive to changes in $\delta_{Yage}$.
+The parameter estimate for age is usually negative, except when $\delta_{Y0}$, $\delta_{Ytime}$ and $\delta_{Yage}$ are all very negative. The interaction effect between time and age is always positive when $\delta_{Y0} >=0$ and negative or insignificant if $\delta_{Y0}<0$. The parameter estimate for $age^2$ is usually positive, unless all three $\delta$'s become negative. The learning effect is impacted a lot by  $\delta_{Y0}$ which is to be expected because learning is equalt to one only when time==1 and imputation are almost exclusively done for observations where learning==0. The parameter estimate for TIME does not seem very impacted by $\delta_{Ytime}$ or $\delta_{Y0}$ but it is very sensitive to changes in $\delta_{Yage}$.
 
 ```{r resultssens2,echo=FALSE, fig.cap= "Heatmap for all parameter estimates, except for the intercept. The rows show the different parameters (covariates). The columns show different values for deltatime." , fig.width = 8, fig.height = 8}
 results %>% filter(term != "(Intercept)") %>%
@@ -1554,7 +1559,8 @@ results %>% filter(term != "(Intercept)") %>%
                         ifelse(estimate>0, "positive","negative"),
                         "not significant")) %>%
   ggplot() +
-  geom_tile(aes(color = color, fill = color, alpha = abs(estimate), x = intercept, y= deltaage)) +
+  geom_tile(aes(color = color, fill = color, alpha = abs(estimate), 
+                x = intercept, y = deltaage)) +
   geom_hline(aes(yintercept = 0)) + 
   facet_grid(rows = vars(term),
              cols = vars(deltatime),,
