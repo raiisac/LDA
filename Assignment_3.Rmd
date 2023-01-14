@@ -1334,10 +1334,13 @@ In Table \@ref(tab:GEEMImonotone) and \@ref(tab:GEEMIfull), we compare the monot
 In the previous sections, some sensitivity analysis was done with respect to the different possible imputation methods. Usually, the model results were quite stable. However, all of the previous models assume MAR. In this section, we explore whether the results are robust if the MAR assumption is not realistic and the missingness is not at random (MNAR). Whether or not there is MAR or MNAR cannot be easily and directly tested since we can never know for sure what the hearing threshold would have been if it is missing [@verbeke2001sensitivity; @van2001local]. It is likely that different assumption on the missingness mechanism will lead to different conclusions, especially if the dropout is higher than 10% [@10.3389/fpsyg.2017.00722]. The dropout/missingness is much higher in our dataset and results are thus expected to be highly impacted.
 
 We use imputation under a MNAR mechanism by the *not at random fully conditional specification* (NARFCS) procedure as described in @tompsett2018use and [$\text{\underline{this useful vignette}}$](https://github.com/moreno-betancur/NARFCS/blob/master/Vignette.md). This method works, even if the missingness is not monotone, and allows us to test the effect of different shifts in the MNAR imputed values on the model coefficients. These shifts may also depend on other covariates (such as age and time, see the unidentifiable part in the equation below). Notice that the unidentifiable part will only come into play when an observation is missing ($R_y=1$). More concretely, The imputed values are of the following form:
-
-\begin{align} 
-{E(Y|X,R_Y)} =&\underbrace{\beta_{Y0}+ \beta_{Yage} age + \beta_{Yage2} age^2 + \beta_{Ytime} TIME + \beta_{Ytimeage} TIME:age}_\text{IDENTIFIABLE PART}\ \\&+\underbrace{R_Y(\delta_{Y0}+\delta_{Yage} age+\delta_{Yage2} age^2 + \delta_{Ytime} TIME + \delta_{Ytimeage} TIME:age)}_\text{UNIDENTIFIABLE PART}. 
-\end{align}
+    
+\begin{equation} 
+\small
+\begin{array}{l}
+      {E(Y|X,R_Y)} =\\\underbrace{\beta_{Y0}+ \beta_{Yage} age + \beta_{Yage2} age^2 + \beta_{Ytime} TIME +             \beta_{Yta} TIME:age+\beta_{Yl} learning}_\text{IDENTIFIABLE PART}\ \\    +\underbrace{R_Y(\delta_{Y0}+\delta_{Yage}age+\delta_{Yage2} age^2 + \delta_{Ytime} TIME + \delta_{Yta} TIME:age)+\delta_{Yl} learning}_\text{UNIDENTIFIABLE PART}.
+      \end{array}
+\end{equation}
 
 In practice, it is suggested that the sensitivity parameters ($\delta$'s) are discussed and chosen with practitioners. For instance, in the hypothetical case that people were asked not to skip a visit if they have a cold, the hearing threshold might be higher if the data is missing and practitioners may have some intuition as to how much higher. It should be noted that eliciting these parameters can be tricky because they are *conditional* on all other parameters (see also section 5). Here, we don't have any information from practitioners and implement the following shifts as an illustration:
 
